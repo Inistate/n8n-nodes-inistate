@@ -1,0 +1,52 @@
+{
+	"name": "n8n-nodes-inistate",
+	"version": "0.1.0",
+	"description": "Community nodes for connecting n8n workflows to Inistate",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"inistate",
+		"workflow",
+		"webhook"
+	],
+	"license": "MIT",
+	"homepage": "https://github.com/Inistate/n8n-nodes-inistate#readme",
+	"author": {
+		"name": "Inistate",
+		"email": "sales@gneysoftware.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Inistate/n8n-nodes-inistate.git"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"test": "npm run build && node --test test/**/*.test.cjs",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/InistateApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/InistateTrigger/InistateTrigger.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "0.44.3",
+		"eslint": "9.39.4",
+		"prettier": "3.8.3",
+		"typescript": "5.9.3"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}

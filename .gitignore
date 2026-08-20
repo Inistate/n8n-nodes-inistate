@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.n8n/
+.cache/
+.env
+*.log
