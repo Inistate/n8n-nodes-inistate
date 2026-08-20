@@ -24,6 +24,15 @@ export function buildEntryCreatedSubscription(
 }
 
 export function getWebhookId(response: unknown): string {
+	if (typeof response === 'string') {
+		const id = response.trim();
+		if (/^[A-Za-z0-9_-]+$/.test(id)) {
+			return id;
+		}
+
+		throw new Error('Inistate returned an invalid webhook registration ID');
+	}
+
 	if (typeof response !== 'object' || response === null || !('id' in response)) {
 		throw new Error('Inistate did not return a webhook registration ID');
 	}

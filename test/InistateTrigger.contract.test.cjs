@@ -34,8 +34,13 @@ test('builds an Entry Created subscription from the legacy Zapier contract', () 
 });
 
 test('accepts string and numeric webhook registration IDs', () => {
+	assert.equal(getWebhookId('AwVSpu5SvM'), 'AwVSpu5SvM');
 	assert.equal(getWebhookId({ id: 'abc' }), 'abc');
 	assert.equal(getWebhookId({ id: 123 }), '123');
+});
+
+test('rejects an invalid direct webhook registration ID', () => {
+	assert.throws(() => getWebhookId('not an id'), /invalid webhook registration ID/);
 });
 
 test('rejects a missing webhook registration ID', () => {
