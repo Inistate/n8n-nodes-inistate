@@ -1,9 +1,9 @@
 {
-	"node": "n8n-nodes-inistate.inistateTrigger",
+	"node": "n8n-nodes-inistate.inistate",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Productivity"],
-	"alias": ["Inistate", "entry", "workflow", "webhook"],
+	"alias": ["Inistate", "entry", "activity", "task", "workflow"],
 	"resources": {
 		"credentialDocumentation": [
 			{
@@ -12,7 +12,7 @@
 		],
 		"primaryDocumentation": [
 			{
-				"url": "https://github.com/Inistate/n8n-nodes-inistate#inistate-trigger"
+				"url": "https://github.com/Inistate/n8n-nodes-inistate#inistate-actions"
 			}
 		]
 	}

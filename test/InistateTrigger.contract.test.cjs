@@ -13,24 +13,21 @@ test('uses the fixed App02 P0 API URL', () => {
 });
 
 test('builds n8n automation headers', () => {
-	assert.deepEqual(buildAutomationHeaders('2306'), {
-		wsId: '2306',
+	assert.deepEqual(buildAutomationHeaders('2307'), {
+		wsId: '2307',
 		medium: 'n8n',
 	});
 });
 
 test('builds an Entry Created subscription from the legacy Zapier contract', () => {
-	assert.deepEqual(
-		buildEntryCreatedSubscription('19295', 'https://n8n.example/webhook/inistate'),
-		{
-			moduleId: '19295',
-			item: 'create',
-			type: 'activity',
-			trigger: 'execute',
-			channel: 'n8n',
-			url: 'https://n8n.example/webhook/inistate',
-		},
-	);
+	assert.deepEqual(buildEntryCreatedSubscription('19296', 'https://n8n.example/webhook/inistate'), {
+		moduleId: '19296',
+		item: 'create',
+		type: 'activity',
+		trigger: 'execute',
+		channel: 'n8n',
+		url: 'https://n8n.example/webhook/inistate',
+	});
 });
 
 test('accepts string and numeric webhook registration IDs', () => {

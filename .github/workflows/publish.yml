@@ -1,0 +1,43 @@
+# Publishes a tagged release from GitHub with npm provenance.
+#
+# One-time npm setup:
+# 1. Open the n8n-nodes-inistate package settings on npmjs.com.
+# 2. Add a GitHub Actions trusted publisher for:
+#      owner: Inistate
+#      repository: n8n-nodes-inistate
+#      workflow: publish.yml
+# 3. Leave the environment blank and do not add NPM_TOKEN when using OIDC.
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          registry-url: https://registry.npmjs.org
+
+      - name: Install npm with trusted-publishing support
+        run: npm install --global npm@11.15.0
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Publish with provenance
+        run: npm run release

@@ -24,7 +24,9 @@
 		"dev": "n8n-node dev",
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
-		"test": "npm run build && node --test test/**/*.test.cjs",
+		"test": "npm run build && node --test --test-force-exit test/**/*.test.cjs",
+		"test:live:app02": "npm run build && node scripts/live-app02-smoke.cjs",
+		"release": "n8n-node release",
 		"prepublishOnly": "n8n-node prerelease"
 	},
 	"files": [
@@ -37,13 +39,16 @@
 			"dist/credentials/InistateApi.credentials.js"
 		],
 		"nodes": [
+			"dist/nodes/Inistate/Inistate.node.js",
 			"dist/nodes/InistateTrigger/InistateTrigger.node.js"
 		]
 	},
 	"devDependencies": {
-		"@n8n/node-cli": "0.44.3",
+		"@n8n/node-cli": "^0.44.4",
+		"auto-changelog": "^2.6.0",
 		"eslint": "9.39.4",
 		"prettier": "3.8.3",
+		"release-it": "^21.0.2",
 		"typescript": "5.9.3"
 	},
 	"peerDependencies": {

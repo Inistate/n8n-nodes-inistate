@@ -2,6 +2,7 @@ import type {
 	IDataObject,
 	IHookFunctions,
 	IHttpRequestOptions,
+	INodeProperties,
 	INodeType,
 	INodeTypeDescription,
 	IWebhookFunctions,
@@ -9,12 +10,50 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
+import { inistateApiRequest, listSearch } from '../shared/GenericFunctions';
 import {
 	APP02_BASE_URL,
-	buildAutomationHeaders,
-	buildEntryCreatedSubscription,
+	buildApiHeaders,
+	buildSubscription,
+	getTriggerItem,
 	getWebhookId,
-} from './InistateTrigger.contract';
+	type P0TriggerEvent,
+} from '../shared/Inistate.contract';
+
+const listMode = (searchListMethod: string) => ({
+	displayName: 'From List',
+	name: 'list',
+	type: 'list' as const,
+	typeOptions: { searchListMethod, searchable: true },
+});
+
+const idMode = (displayName: string, placeholder: string) => ({
+	displayName: 'By ID',
+	name: 'id',
+	type: 'string' as const,
+	placeholder,
+	hint: `Enter the ${displayName} ID when it is not available in the list`,
+});
+
+const workspaceProperty: INodeProperties = {
+	displayName: 'Workspace',
+	name: 'workspaceId',
+	type: 'resourceLocator',
+	default: { mode: 'list', value: '' },
+	required: true,
+	description: 'The Inistate workspace to monitor',
+	modes: [listMode('searchWorkspaces'), idMode('workspace', '2307')],
+};
+
+const moduleProperty: INodeProperties = {
+	displayName: 'Module',
+	name: 'moduleId',
+	type: 'resourceLocator',
+	default: { mode: 'list', value: '' },
+	required: true,
+	description: 'The module to monitor',
+	modes: [listMode('searchModules'), idMode('module', '19296')],
+};
 
 export class InistateTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -23,8 +62,8 @@ export class InistateTrigger implements INodeType {
 		icon: { light: 'file:inistate.svg', dark: 'file:inistate.dark.svg' },
 		group: ['trigger'],
 		version: 1,
-		subtitle: 'Entry Created',
-		description: 'Starts the workflow when an entry is created in Inistate',
+		subtitle: '={{$parameter["event"]}}',
+		description: 'Starts the workflow when a supported Inistate entry event occurs',
 		defaults: {
 			name: 'Inistate Trigger',
 		},
@@ -52,25 +91,45 @@ export class InistateTrigger implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Workspace ID',
-				name: 'workspaceId',
-				type: 'string',
-				default: '',
-				required: true,
-				placeholder: '2306',
-				description: 'Numeric ID of the Inistate workspace',
+				displayName: 'Event',
+				name: 'event',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{
+						name: 'Activity Performed',
+						value: 'activityPerformed',
+						description: 'Runs when the selected activity is performed',
+					},
+					{
+						name: 'Entry Created',
+						value: 'entryCreated',
+						description: 'Runs when an entry is created',
+					},
+					{
+						name: 'Entry Updated',
+						value: 'entryUpdated',
+						description: 'Runs when an entry is edited',
+					},
+				],
+				default: 'entryCreated',
 			},
+			workspaceProperty,
+			moduleProperty,
 			{
-				displayName: 'Module ID',
-				name: 'moduleId',
-				type: 'string',
-				default: '',
+				displayName: 'Activity',
+				name: 'activityId',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
 				required: true,
-				placeholder: '19295',
-				description: 'Numeric ID of the module to monitor',
+				description: 'Only callbacks for this activity will be registered',
+				displayOptions: { show: { event: ['activityPerformed'] } },
+				modes: [listMode('searchActivities'), idMode('activity', 'bd438...')],
 			},
 		],
 	};
+
+	methods = { listSearch };
 
 	webhookMethods = {
 		default: {
@@ -85,21 +144,23 @@ export class InistateTrigger implements INodeType {
 					throw new NodeOperationError(this.getNode(), 'n8n did not provide a webhook URL');
 				}
 
-				const workspaceId = this.getNodeParameter('workspaceId') as string;
-				const moduleId = this.getNodeParameter('moduleId') as string;
+				const workspaceId = String(
+					this.getNodeParameter('workspaceId', undefined, { extractValue: true }),
+				);
+				const moduleId = String(
+					this.getNodeParameter('moduleId', undefined, { extractValue: true }),
+				);
+				const event = this.getNodeParameter('event') as P0TriggerEvent;
+				const activityId = String(this.getNodeParameter('activityId', '', { extractValue: true }));
 				const requestOptions: IHttpRequestOptions = {
 					method: 'POST',
 					url: `${APP02_BASE_URL}/api/automationHook`,
-					headers: buildAutomationHeaders(workspaceId),
-					body: buildEntryCreatedSubscription(moduleId, webhookUrl),
+					headers: buildApiHeaders(workspaceId),
+					body: buildSubscription(moduleId, getTriggerItem(event, activityId), webhookUrl),
 					json: true,
 				};
 
-				const response = await this.helpers.httpRequestWithAuthentication.call(
-					this,
-					'inistateApi',
-					requestOptions,
-				);
+				const response = await inistateApiRequest(this, requestOptions);
 
 				try {
 					this.getWorkflowStaticData('node').webhookId = getWebhookId(response);
@@ -116,20 +177,18 @@ export class InistateTrigger implements INodeType {
 					return true;
 				}
 
-				const workspaceId = this.getNodeParameter('workspaceId') as string;
+				const workspaceId = String(
+					this.getNodeParameter('workspaceId', undefined, { extractValue: true }),
+				);
 				const webhookId = String(webhookData.webhookId);
 				const requestOptions: IHttpRequestOptions = {
 					method: 'GET',
 					url: `${APP02_BASE_URL}/api/automationHook/delete/${encodeURIComponent(webhookId)}`,
-					headers: { wsId: workspaceId },
+					headers: buildApiHeaders(workspaceId, false),
 					json: true,
 				};
 
-				await this.helpers.httpRequestWithAuthentication.call(
-					this,
-					'inistateApi',
-					requestOptions,
-				);
+				await inistateApiRequest(this, requestOptions);
 
 				delete webhookData.webhookId;
 				return true;
@@ -138,11 +197,7 @@ export class InistateTrigger implements INodeType {
 	};
 
 	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {
-		const returnData: IDataObject = {
-			body: this.getBodyData(),
-			headers: this.getHeaderData(),
-			query: this.getQueryData(),
-		};
+		const returnData: IDataObject = this.getBodyData();
 
 		return {
 			workflowData: [this.helpers.returnJsonArray(returnData)],
