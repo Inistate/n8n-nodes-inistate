@@ -52,9 +52,11 @@ Change State sends the selected state's name, matching the existing Inistate API
 
 ## Credentials
 
-Create an **Inistate API** credential and enter an App02 API key. n8n stores the key in its encrypted
-credential store and sends it as `Authorization: fsk <API key>`. The key is never a workflow
-parameter. The credential test calls:
+Create an **Inistate API** credential and enter an App02 API key and your Inistate username (normally
+your email address). The username identifies the saved connection in the credential form; matching
+Zapier, it is not sent to Inistate or validated as part of authentication. n8n stores the key in its
+encrypted credential store and sends it as `Authorization: fsk <API key>`. The key is never a
+workflow parameter. The credential test calls:
 
 ```text
 GET https://app02.apps.inistate.com/api/profile

@@ -3,18 +3,21 @@ const test = require('node:test');
 
 const { InistateTrigger } = require('../dist/nodes/InistateTrigger/InistateTrigger.node.js');
 
-function createHookContext(requests, staticData) {
+function createHookContext(requests, staticData, event = 'activityPerformed') {
 	const parameters = {
 		workspaceId: { value: '2307' },
 		moduleId: { value: '19296' },
-		event: 'activityPerformed',
-		activityId: { value: 'activity-1' },
+		event,
+		...(event === 'activityPerformed' ? { activityId: { value: 'activity-1' } } : {}),
 	};
 
 	return {
 		getWorkflowStaticData: () => staticData,
 		getNodeWebhookUrl: () => 'https://n8n.example/webhook/inistate',
 		getNodeParameter(name, fallback, options) {
+			if (!Object.prototype.hasOwnProperty.call(parameters, name)) {
+				throw new Error('Could not find property');
+			}
 			const value = parameters[name] ?? fallback;
 			return options?.extractValue && value && typeof value === 'object' ? value.value : value;
 		},
@@ -74,6 +77,21 @@ test('registers, recognizes, and removes an Activity Performed webhook', async (
 			json: true,
 		},
 	});
+});
+
+test('registers entry events without reading the hidden Activity property', async () => {
+	const node = new InistateTrigger();
+	for (const [event, item] of [
+		['entryCreated', 'create'],
+		['entryUpdated', 'edit'],
+	]) {
+		const requests = [];
+		const context = createHookContext(requests, {}, event);
+
+		assert.equal(await node.webhookMethods.default.create.call(context), true);
+		assert.equal(requests.length, 1);
+		assert.equal(requests[0].options.body.item, item);
+	}
 });
 
 test('passes the delivered webhook JSON directly to the workflow', async () => {

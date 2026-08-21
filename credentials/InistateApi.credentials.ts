@@ -24,6 +24,16 @@ export class InistateApi implements ICredentialType {
 			required: true,
 			description: 'API key used to authenticate with the App02 Inistate API',
 		},
+		{
+			displayName: 'Inistate Username',
+			name: 'username',
+			type: 'string',
+			default: '',
+			required: true,
+			placeholder: 'name@example.com',
+			description:
+				'Username for identifying this Inistate connection. It is not sent to the API for authentication.',
+		},
 	];
 
 	authenticate: IAuthenticateGeneric = {

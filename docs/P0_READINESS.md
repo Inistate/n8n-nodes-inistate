@@ -1,9 +1,11 @@
 # P0 readiness record
 
-Last updated: 2026-08-20 (Asia/Singapore)
+Last updated: 2026-08-21 (Asia/Singapore)
 
-Decision: **NOT READY**. The protected P0 implementation exists and automated checks pass, but live
-App02 action/delivery tests and mandatory publishing controls are incomplete.
+Decision: **NOT READY**. The protected P0 implementation exists, automated checks pass, and the
+requester reports that all five exposed action operations and all three triggers passed basic live
+App02 testing through a public tunnel. The full live field matrix and mandatory publishing controls
+remain incomplete.
 
 Status meanings:
 
@@ -16,25 +18,25 @@ Status meanings:
 
 | Requirement                                               | Status                | Evidence                                                                                              |
 | --------------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
-| Create Entry                                              | Confirmed (automated) | Exact `create` request contract and multi-item execution tests                                        |
-| Update Entry                                              | Confirmed (automated) | Exact `edit` request contract and multi-item execution tests                                          |
-| Perform Activity, with and without a form                 | Confirmed (automated) | Selected activity request and empty-form payload tests                                                |
-| Change State                                              | Confirmed (automated) | Exact `changeStatus` request with destination state name                                              |
-| Assign                                                    | Confirmed (automated) | Exact `assign` request with username and optional due date                                            |
-| Entry Created                                             | Confirmed (automated) | Registration `item: create` contract                                                                  |
-| Entry Updated                                             | Confirmed (automated) | Registration `item: edit` contract                                                                    |
-| Activity Performed with filtering                         | Confirmed (automated) | Registration with selected activity ID                                                                |
+| Create Entry                                              | Confirmed              | Exact automated contract plus requester-confirmed basic live execution                                |
+| Update Entry                                              | Confirmed              | Exact automated contract plus requester-confirmed basic live execution                                |
+| Perform Activity, with and without a form                 | Confirmed              | Automated form/no-form contracts plus requester-confirmed basic live execution                        |
+| Change State                                              | Confirmed              | Exact automated contract plus requester-confirmed basic live execution                                |
+| Assign                                                    | Confirmed              | Exact automated contract plus requester-confirmed basic live execution                                |
+| Entry Created                                             | Confirmed              | Automated `item: create` contract plus requester-confirmed live delivery                              |
+| Entry Updated                                             | Confirmed              | Automated `item: edit` contract plus requester-confirmed live delivery                                |
+| Activity Performed with filtering                         | Confirmed              | Automated selected-activity contract plus requester-confirmed live delivery                           |
 | Workspace, Module, Activity, Field, State, User selectors | Confirmed (automated) | All six method-level selector tests; dependency scoping covered                                       |
 | API-key credentials                                       | Confirmed             | Password field, generic `fsk` authentication, `/api/profile` test                                     |
 | Dynamic forms                                             | Partial               | Recursive/type/read-only/unsupported automated tests pass; full live form matrix is incomplete        |
 | Multi-item and Continue On Fail behavior                  | Confirmed (automated) | Runtime execution tests preserve paired item indexes and errors                                       |
-| Webhook register/check/delete/delivery lifecycle          | Partial               | Automated lifecycle passes; live registration returned `AwVSpu5SvM`; live delivery/removal not proven |
+| Webhook register/check/delete/delivery lifecycle          | Partial                | Automated lifecycle passes and live delivery is requester-confirmed; live removal is not yet proven   |
 
 Run evidence:
 
 ```text
 npm test
-19 tests, 19 passed, 0 failed
+23 tests, 23 passed, 0 failed
 
 npm run lint
 exit code 0 with @n8n/node-cli 0.44.4
@@ -53,9 +55,9 @@ exit code 0; 30 files; both nodes, credentials, metadata, icons, and shared runt
 | Representative basic field types                     | Confirmed              | Text, MultiText, Selection, Number, Date, DateTime, YesNo present               |
 | Three states and two transitions                     | Confirmed              | Backlog → In Progress → Completed                                               |
 | Activities with/without forms                        | Confirmed              | Start Work (none), Complete Task (required fields)                              |
-| `medium: n8n` accepted by activity endpoint          | Pending                | Must execute all five action paths through the node                             |
+| `medium: n8n` accepted by activity endpoint          | Confirmed by requester | All five exposed action paths passed basic live testing                         |
 | `medium: n8n` / `channel: n8n` registration accepted | Confirmed              | App02 returned registration ID `AwVSpu5SvM`                                     |
-| Public webhook callback delivered                    | Blocked                | Current local callback is not publicly reachable; HTTPS tunnel/test host needed |
+| Public webhook callback delivered                    | Confirmed by requester | All three trigger events delivered through a temporary Cloudflare HTTPS tunnel  |
 | Automation hook removed                              | Pending                | Remove current/known registrations and verify cleanup                           |
 | Seeded `N8N-TEST` entry                              | Pending                | Existing entries are not sufficient evidence for the defined automated prefix   |
 | Module and user-reference live fields                | Pending                | Current sandbox form does not contain these cases                               |

@@ -151,7 +151,10 @@ export class InistateTrigger implements INodeType {
 					this.getNodeParameter('moduleId', undefined, { extractValue: true }),
 				);
 				const event = this.getNodeParameter('event') as P0TriggerEvent;
-				const activityId = String(this.getNodeParameter('activityId', '', { extractValue: true }));
+				const activityId =
+					event === 'activityPerformed'
+						? String(this.getNodeParameter('activityId', undefined, { extractValue: true }))
+						: undefined;
 				const requestOptions: IHttpRequestOptions = {
 					method: 'POST',
 					url: `${APP02_BASE_URL}/api/automationHook`,
