@@ -58,7 +58,7 @@ async function request(path, options = {}) {
 async function getForm(activityId) {
 	return await request('/api/Activity/Form', {
 		method: 'POST',
-		headers: headers(false),
+		headers: headers(),
 		body: { vectorId: moduleId, activityId },
 	});
 }
@@ -101,6 +101,10 @@ function findNamed(values, name) {
 }
 
 function extractDocumentId(response) {
+	if (typeof response === 'string' && response.trim().length > 0) {
+		return response.trim();
+	}
+
 	const candidates = [
 		response?.header?.documentId,
 		response?.documentId,
@@ -111,10 +115,45 @@ function extractDocumentId(response) {
 	const documentId = candidates.find(
 		(value) => typeof value === 'string' && value.trim().length > 0,
 	);
-	if (!documentId) {
-		throw new Error('App02 create response did not contain a document ID');
+	if (documentId) {
+		return documentId;
 	}
-	return documentId;
+
+	const visited = new Set();
+	const queue = [response];
+	while (queue.length > 0) {
+		const value = queue.shift();
+		if (!value || typeof value !== 'object' || visited.has(value)) {
+			continue;
+		}
+		visited.add(value);
+
+		for (const [key, candidate] of Object.entries(value)) {
+			if (
+				['documentid', 'document', 'documentno', 'documentnumber'].includes(
+					key.toLocaleLowerCase(),
+				) &&
+				(typeof candidate === 'string' || typeof candidate === 'number') &&
+				String(candidate).trim().length > 0
+			) {
+				return String(candidate).trim();
+			}
+			if (candidate && typeof candidate === 'object') {
+				queue.push(candidate);
+			}
+		}
+	}
+
+	const responseType = Array.isArray(response)
+		? 'array'
+		: response === null
+			? 'null'
+			: typeof response;
+	const topLevelKeys =
+		response && typeof response === 'object' ? Object.keys(response).sort().join(',') : 'none';
+	throw new Error(
+		`App02 create response did not contain a document ID (type=${responseType}; keys=${topLevelKeys})`,
+	);
 }
 
 async function activity(body) {

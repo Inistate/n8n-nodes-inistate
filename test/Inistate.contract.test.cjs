@@ -7,6 +7,7 @@ const {
 	buildSubscription,
 	extractCollection,
 	extractFormElements,
+	getFormDefaultValues,
 	getMappedFieldValues,
 	getTriggerItem,
 	mapFormFields,
@@ -127,6 +128,16 @@ test('omits an empty optional assignment due date and validates operation identi
 			}),
 		/Document ID is required/,
 	);
+	assert.throws(
+		() =>
+			buildActionBody({
+				operation: 'update',
+				moduleId: '19296',
+				documentId: '806548',
+				fields: { priority: 'Medium' },
+			}),
+		/Use the document ID.*P0 00006.*not the internal numeric entry ID/,
+	);
 });
 
 test('builds all protected trigger subscriptions', () => {
@@ -164,6 +175,13 @@ test('normalizes selector response shapes, filters, and de-duplicates values', (
 
 const nestedFormResponse = {
 	classificationForm: {
+		default: {
+			'title-id': 'Existing title',
+			'blocked-id': false,
+			'priority-id': 'Low',
+			'readonly-id': 42,
+			'unsupported-id': 'Preserve this value',
+		},
 		design: {
 			rows: [
 				{
@@ -291,4 +309,13 @@ test('provides the supporting Field selector from recursively nested form elemen
 	assert.deepEqual(toFieldSearchItems(nestedFormResponse, 'priority'), [
 		{ name: 'Priority', value: 'priority-id' },
 	]);
+});
+
+test('maps edit-form defaults to field names while excluding read-only values', () => {
+	assert.deepEqual(getFormDefaultValues(nestedFormResponse), {
+		title: 'Existing title',
+		blocked: false,
+		priority: 'Low',
+		unsupported: 'Preserve this value',
+	});
 });

@@ -60,15 +60,21 @@ export function buildActionBody(input: ActionRequestInput): IDataObject {
 		};
 	}
 
-	if (!input.documentId) {
+	const documentId = input.documentId?.trim() ?? '';
+	if (!documentId) {
 		throw new Error(`Document ID is required for the ${operation} operation`);
+	}
+	if (/^\d+$/.test(documentId)) {
+		throw new Error(
+			'Use the document ID (for example "P0 00006"), not the internal numeric entry ID.',
+		);
 	}
 
 	if (operation === 'update') {
 		return {
 			activityId: 'edit',
 			moduleId,
-			entry: input.documentId,
+			entry: documentId,
 			payload: getMappedFieldValues(input.fields),
 		};
 	}
@@ -81,7 +87,7 @@ export function buildActionBody(input: ActionRequestInput): IDataObject {
 		return {
 			activityId: input.activityId,
 			moduleId,
-			entry: input.documentId,
+			entry: documentId,
 			payload: getMappedFieldValues(input.fields),
 		};
 	}
@@ -94,7 +100,7 @@ export function buildActionBody(input: ActionRequestInput): IDataObject {
 		return {
 			activityId: 'changeStatus',
 			moduleId,
-			entry: input.documentId,
+			entry: documentId,
 			state: input.stateName,
 		};
 	}
@@ -110,7 +116,7 @@ export function buildActionBody(input: ActionRequestInput): IDataObject {
 	const body: IDataObject = {
 		activityId: 'assign',
 		assignees: [input.username],
-		entry: input.documentId,
+		entry: documentId,
 		moduleId,
 	};
 
@@ -294,6 +300,37 @@ export function mapFormFields(response: unknown): ResourceMapperField[] {
 	}
 
 	return fields;
+}
+
+export function getFormDefaultValues(response: unknown): IDataObject {
+	if (
+		!isRecord(response) ||
+		!isRecord(response.classificationForm) ||
+		!isRecord(response.classificationForm.default)
+	) {
+		return {};
+	}
+
+	const defaults = response.classificationForm.default;
+	const values: IDataObject = {};
+	for (const element of extractFormElements(response)) {
+		if (element.readOnly === true) {
+			continue;
+		}
+		const fieldName = firstPrimitive(element, ['fieldName']);
+		const elementId = firstPrimitive(element, ['id']);
+		if (fieldName === undefined) {
+			continue;
+		}
+		const defaultKey = [elementId, fieldName].find(
+			(key) =>
+				key !== undefined && Object.prototype.hasOwnProperty.call(defaults, String(key)),
+		);
+		if (defaultKey !== undefined) {
+			values[String(fieldName)] = defaults[String(defaultKey)] as IDataObject[string];
+		}
+	}
+	return values;
 }
 
 export function toFieldSearchItems(response: unknown, filter = ''): INodeListSearchItems[] {

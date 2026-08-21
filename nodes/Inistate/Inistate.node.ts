@@ -10,8 +10,19 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
-import { inistateApiRequest, listSearch, resourceMapping } from '../shared/GenericFunctions';
-import { buildActionBody, buildApiHeaders, type P0Operation } from '../shared/Inistate.contract';
+import {
+	getCurrentEntryFields,
+	inistateApiRequest,
+	listSearch,
+	resourceMapping,
+} from '../shared/GenericFunctions';
+import {
+	buildActionBody,
+	buildApiHeaders,
+	getMappedFieldValues,
+	type ActionRequestInput,
+	type P0Operation,
+} from '../shared/Inistate.contract';
 
 const listMode = (searchListMethod: string) => ({
 	displayName: 'From List',
@@ -243,29 +254,56 @@ export class Inistate implements INodeType {
 				const moduleId = String(
 					this.getNodeParameter('moduleId', itemIndex, '', { extractValue: true }),
 				);
-				const supportsFields = ['create', 'update', 'performActivity'].includes(operation);
+				const actionInput: ActionRequestInput = { operation, moduleId };
+				if (operation !== 'create') {
+					actionInput.documentId = String(
+						this.getNodeParameter('documentId', itemIndex),
+					);
+				}
+				if (operation === 'create' || operation === 'update' || operation === 'performActivity') {
+					actionInput.fields = this.getNodeParameter(
+						'fields',
+						itemIndex,
+					) as ResourceMapperValue;
+				}
+				if (operation === 'update') {
+					const selectedFields = getMappedFieldValues(actionInput.fields);
+					if (Object.keys(selectedFields).length === 0) {
+						throw new NodeOperationError(
+							this.getNode(),
+							new Error('Select at least one field to update'),
+							{ itemIndex },
+						);
+					}
+					const currentFields = await getCurrentEntryFields(
+						this,
+						workspaceId,
+						moduleId,
+						actionInput.documentId ?? '',
+					);
+					actionInput.fields = { ...currentFields, ...selectedFields };
+				}
+				if (operation === 'performActivity') {
+					actionInput.activityId = String(
+						this.getNodeParameter('activityId', itemIndex, '', { extractValue: true }),
+					);
+				}
+				if (operation === 'changeState') {
+					actionInput.stateName = String(
+						this.getNodeParameter('stateName', itemIndex, '', { extractValue: true }),
+					);
+				}
+				if (operation === 'assign') {
+					actionInput.username = String(
+						this.getNodeParameter('username', itemIndex, '', { extractValue: true }),
+					);
+					actionInput.dueDate = String(this.getNodeParameter('dueDate', itemIndex, ''));
+				}
 				const requestOptions: IHttpRequestOptions = {
 					method: 'POST',
 					url: '/api/activity/',
 					headers: buildApiHeaders(workspaceId),
-					body: buildActionBody({
-						operation,
-						moduleId,
-						documentId: String(this.getNodeParameter('documentId', itemIndex, '')),
-						activityId: String(
-							this.getNodeParameter('activityId', itemIndex, '', { extractValue: true }),
-						),
-						stateName: String(
-							this.getNodeParameter('stateName', itemIndex, '', { extractValue: true }),
-						),
-						username: String(
-							this.getNodeParameter('username', itemIndex, '', { extractValue: true }),
-						),
-						dueDate: String(this.getNodeParameter('dueDate', itemIndex, '')),
-						fields: supportsFields
-							? (this.getNodeParameter('fields', itemIndex, {}) as ResourceMapperValue)
-							: undefined,
-					}),
+					body: buildActionBody(actionInput),
 				};
 				const response = await inistateApiRequest(this, requestOptions);
 				returnData.push({
@@ -280,7 +318,6 @@ export class Inistate implements INodeType {
 					});
 					continue;
 				}
-
 				throw new NodeOperationError(
 					this.getNode(),
 					error instanceof Error ? error : new Error('Unknown Inistate error'),

@@ -58,6 +58,29 @@ test('executes two input items independently with explicit payloads and paired o
 		helpers: {
 			async httpRequestWithAuthentication(credentialName, options) {
 				requests.push({ credentialName, options });
+				if (options.url.endsWith('/api/Workspace/2307')) {
+					return { vectors: [{ id: 19296, menus: [{ id: 'defaultListing' }] }] };
+				}
+				if (options.url.endsWith('/api/workspace/list')) {
+					return { data: { list: [{ id: 806548, documentId: 'N8N-TEST00001' }] } };
+				}
+				if (options.url.endsWith('/api/Activity/Form')) {
+					return {
+						classificationForm: {
+							default: { 'title-id': 'Existing title', 'priority-id': 'Medium' },
+							design: {
+								rows: [
+									{
+										items: [
+											{ id: 'title-id', fieldName: 'title', type: 0 },
+											{ id: 'priority-id', fieldName: 'priority', type: 27 },
+										],
+									},
+								],
+							},
+						},
+					};
+				}
 				return { requestNumber: requests.length };
 			},
 		},
@@ -74,7 +97,9 @@ test('executes two input items independently with explicit payloads and paired o
 
 	const output = await node.execute.call(context);
 	assert.deepEqual(
-		requests.map(({ credentialName, options }) => ({ credentialName, ...options })),
+		requests
+			.filter(({ options }) => options.url.endsWith('/api/activity/'))
+			.map(({ credentialName, options }) => ({ credentialName, ...options })),
 		[
 			{
 				credentialName: 'inistateApi',
@@ -97,7 +122,7 @@ test('executes two input items independently with explicit payloads and paired o
 					activityId: 'edit',
 					moduleId: '19296',
 					entry: 'N8N-TEST00001',
-					payload: { priority: 'High' },
+					payload: { title: 'Existing title', priority: 'High' },
 				},
 				json: true,
 			},
@@ -106,8 +131,65 @@ test('executes two input items independently with explicit payloads and paired o
 	assert.deepEqual(output, [
 		[
 			{ json: { requestNumber: 1 }, pairedItem: { item: 0 } },
-			{ json: { requestNumber: 2 }, pairedItem: { item: 1 } },
+			{ json: { requestNumber: 5 }, pairedItem: { item: 1 } },
 		],
+	]);
+	assert.deepEqual(requests[2].options.body, {
+		moduleId: '19296',
+		listingId: 'defaultListing',
+		withHeader: false,
+		currentPage: 0,
+		pageSize: 10,
+		filters: null,
+		sorts: null,
+		search: 'N8N-TEST00001',
+	});
+	assert.deepEqual(requests[3].options.body, {
+		vectorId: '19296',
+		activityId: 'edit',
+		entryId: 806548,
+	});
+});
+
+test('does not read operation-specific properties hidden from Create', async () => {
+	const node = new Inistate();
+	const requests = [];
+	const parameters = {
+		operation: 'create',
+		workspaceId: { mode: 'id', value: '2307' },
+		moduleId: { mode: 'id', value: '19296' },
+		fields: {
+			mappingMode: 'defineBelow',
+			value: { title: 'N8N-TEST strict create' },
+			matchingColumns: [],
+			schema: [],
+			attemptToConvertTypes: false,
+			convertFieldsToString: false,
+		},
+	};
+	const context = {
+		getInputData: () => [{ json: {} }],
+		getNodeParameter(name, _itemIndex, _fallback, options) {
+			if (!Object.prototype.hasOwnProperty.call(parameters, name)) {
+				throw new Error('Could not find property');
+			}
+			return extractParameter(parameters[name], options);
+		},
+		helpers: {
+			async httpRequestWithAuthentication(credentialName, options) {
+				requests.push({ credentialName, options });
+				return { header: { documentId: 'P0 00006' } };
+			},
+		},
+		continueOnFail: () => false,
+		getNode: () => ({ name: 'Create entry' }),
+	};
+
+	const output = await node.execute.call(context);
+	assert.equal(requests.length, 1);
+	assert.equal(requests[0].options.body.activityId, 'create');
+	assert.deepEqual(output, [
+		[{ json: { header: { documentId: 'P0 00006' } }, pairedItem: { item: 0 } }],
 	]);
 });
 
@@ -250,5 +332,6 @@ test('implements Workspace, Module, Activity, Field, State, and User selectors',
 	assert.deepEqual(activityRequest.options.headers, { wsId: '2307' });
 	assert.deepEqual(activityRequest.options.body, { moduleId: '19296' });
 	const formRequest = requests.at(-1).options;
+	assert.deepEqual(formRequest.headers, { wsId: '2307' });
 	assert.deepEqual(formRequest.body, { vectorId: '19296', activityId: 'activity-1' });
 });

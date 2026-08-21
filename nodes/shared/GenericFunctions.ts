@@ -1,5 +1,6 @@
 import type {
 	IAllExecuteFunctions,
+	IDataObject,
 	IExecuteFunctions,
 	IHookFunctions,
 	IHttpRequestOptions,
@@ -12,6 +13,7 @@ import {
 	APP02_BASE_URL,
 	buildApiHeaders,
 	extractCollection,
+	getFormDefaultValues,
 	mapFormFields,
 	toFieldSearchItems,
 	toSearchItems,
@@ -40,7 +42,7 @@ function getSelectedValue(context: ILoadOptionsFunctions, parameterName: string)
 }
 
 async function getWorkspaceDetails(
-	context: ILoadOptionsFunctions,
+	context: InistateRequestFunctions,
 	workspaceId: string,
 ): Promise<unknown> {
 	if (!workspaceId) {
@@ -54,22 +56,97 @@ async function getWorkspaceDetails(
 }
 
 async function getModuleForm(
-	context: ILoadOptionsFunctions,
+	context: InistateRequestFunctions,
+	workspaceId: string,
 	moduleId: string,
 	activityId?: string,
+	entryId?: string | number,
 ): Promise<unknown> {
-	if (!moduleId) {
+	if (!workspaceId || !moduleId) {
 		return {};
 	}
 
 	return await inistateApiRequest(context, {
 		method: 'POST',
 		url: '/api/Activity/Form',
+		headers: buildApiHeaders(workspaceId, false),
 		body: {
 			vectorId: moduleId,
 			...(activityId ? { activityId } : {}),
+			...(entryId !== undefined ? { entryId } : {}),
 		},
 	});
+}
+
+export async function getCurrentEntryFields(
+	context: InistateRequestFunctions,
+	workspaceId: string,
+	moduleId: string,
+	documentId: string,
+): Promise<IDataObject> {
+	const workspace = await getWorkspaceDetails(context, workspaceId);
+	const targetModule = extractCollection(workspace, 'vectors').find(
+		(value) =>
+			typeof value === 'object' &&
+			value !== null &&
+			!Array.isArray(value) &&
+			String((value as Record<string, unknown>).id) === moduleId,
+	) as Record<string, unknown> | undefined;
+	const listings = Array.isArray(targetModule?.menus) ? targetModule.menus : [];
+	if (listings.length === 0) {
+		throw new Error('No accessible listing is available to resolve the entry document ID');
+	}
+
+	let entryId: string | number | undefined;
+	for (const listing of listings) {
+		if (typeof listing !== 'object' || listing === null || Array.isArray(listing)) {
+			continue;
+		}
+		const listingId = (listing as Record<string, unknown>).id;
+		if (typeof listingId !== 'string' && typeof listingId !== 'number') {
+			continue;
+		}
+		const listResponse = await inistateApiRequest(context, {
+			method: 'POST',
+			url: '/api/workspace/list',
+			headers: buildApiHeaders(workspaceId, false),
+			body: {
+				moduleId,
+				listingId,
+				withHeader: false,
+				currentPage: 0,
+				pageSize: 10,
+				filters: null,
+				sorts: null,
+				search: documentId,
+			},
+		});
+		const listData =
+			typeof listResponse === 'object' && listResponse !== null && !Array.isArray(listResponse)
+				? (listResponse as Record<string, unknown>).data
+				: undefined;
+		const entry = extractCollection(listData, 'list').find(
+			(value) =>
+				typeof value === 'object' &&
+				value !== null &&
+				!Array.isArray(value) &&
+				String((value as Record<string, unknown>).documentId) === documentId,
+		) as Record<string, unknown> | undefined;
+		if (entry && (typeof entry.id === 'string' || typeof entry.id === 'number')) {
+			entryId = entry.id;
+			break;
+		}
+	}
+
+	if (entryId === undefined) {
+		throw new Error(`No accessible entry was found with document ID "${documentId}"`);
+	}
+	const form = await getModuleForm(context, workspaceId, moduleId, 'edit', entryId);
+	const currentValues = getFormDefaultValues(form);
+	if (Object.keys(currentValues).length === 0) {
+		throw new Error('Inistate did not return the current editable field values');
+	}
+	return currentValues;
 }
 
 export const listSearch = {
@@ -130,8 +207,9 @@ export const listSearch = {
 	},
 
 	async searchFields(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
+		const workspaceId = getSelectedValue(this, 'workspaceId');
 		const moduleId = getSelectedValue(this, 'moduleId');
-		const response = await getModuleForm(this, moduleId);
+		const response = await getModuleForm(this, workspaceId, moduleId);
 		return { results: toFieldSearchItems(response, filter) };
 	},
 
@@ -167,6 +245,7 @@ export const listSearch = {
 export const resourceMapping = {
 	async getFormFields(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
 		const operation = String(this.getNodeParameter('operation'));
+		const workspaceId = getSelectedValue(this, 'workspaceId');
 		const moduleId = getSelectedValue(this, 'moduleId');
 		const activityId =
 			operation === 'performActivity'
@@ -174,7 +253,7 @@ export const resourceMapping = {
 				: operation === 'update'
 					? 'edit'
 					: 'create';
-		const response = await getModuleForm(this, moduleId, activityId);
+		const response = await getModuleForm(this, workspaceId, moduleId, activityId);
 		const fields = mapFormFields(response);
 
 		return {
