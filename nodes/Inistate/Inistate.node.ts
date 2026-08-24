@@ -1,146 +1,20 @@
 import type {
 	IDataObject,
 	IExecuteFunctions,
-	IHttpRequestOptions,
 	INodeExecutionData,
-	INodeProperties,
 	INodeType,
 	INodeTypeDescription,
-	ResourceMapperValue,
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import {
-	getCurrentEntryFields,
-	inistateApiRequest,
-	listSearch,
-	resourceMapping,
-} from '../shared/GenericFunctions';
-import {
-	buildActionBody,
-	buildApiHeaders,
-	getMappedFieldValues,
-	type ActionRequestInput,
-	type P0Operation,
-} from '../shared/Inistate.contract';
-
-const listMode = (searchListMethod: string) => ({
-	displayName: 'From List',
-	name: 'list',
-	type: 'list' as const,
-	typeOptions: {
-		searchListMethod,
-		searchable: true,
-	},
-});
-
-const idMode = (displayName: string, placeholder: string) => ({
-	displayName: 'By ID',
-	name: 'id',
-	type: 'string' as const,
-	placeholder,
-	hint: `Enter the ${displayName} ID when it is not available in the list`,
-});
-
-const workspaceProperty: INodeProperties = {
-	displayName: 'Workspace',
-	name: 'workspaceId',
-	type: 'resourceLocator',
-	default: { mode: 'list', value: '' },
-	required: true,
-	description: 'The Inistate workspace to use',
-	modes: [listMode('searchWorkspaces'), idMode('workspace', '2307')],
-};
-
-const moduleProperty: INodeProperties = {
-	displayName: 'Module',
-	name: 'moduleId',
-	type: 'resourceLocator',
-	default: { mode: 'list', value: '' },
-	required: true,
-	description: 'The module containing the entry',
-	modes: [listMode('searchModules'), idMode('module', '19296')],
-};
-
-const activityProperty: INodeProperties = {
-	displayName: 'Activity',
-	name: 'activityId',
-	type: 'resourceLocator',
-	default: { mode: 'list', value: '' },
-	required: true,
-	description: 'The activity to perform',
-	displayOptions: { show: { operation: ['performActivity'] } },
-	modes: [listMode('searchActivities'), idMode('activity', 'bd438...')],
-};
-
-const stateProperty: INodeProperties = {
-	displayName: 'State',
-	name: 'stateName',
-	type: 'resourceLocator',
-	default: { mode: 'list', value: '' },
-	required: true,
-	description: 'The destination state name expected by the Inistate activity API',
-	displayOptions: { show: { operation: ['changeState'] } },
-	modes: [
-		listMode('searchStates'),
-		{
-			displayName: 'By Name',
-			name: 'name',
-			type: 'string',
-			placeholder: 'Completed',
-			hint: 'Enter the exact Inistate state name',
-		},
-	],
-};
-
-const userProperty: INodeProperties = {
-	displayName: 'User',
-	name: 'username',
-	type: 'resourceLocator',
-	default: { mode: 'list', value: '' },
-	required: true,
-	description: 'The Inistate user to assign, represented by username',
-	displayOptions: { show: { operation: ['assign'] } },
-	modes: [
-		listMode('searchUsers'),
-		{
-			displayName: 'By Username',
-			name: 'username',
-			type: 'string',
-			placeholder: 'user@example.com',
-			hint: 'Enter the exact Inistate username',
-		},
-	],
-};
-
-const fieldsProperty: INodeProperties = {
-	displayName: 'Fields',
-	name: 'fields',
-	type: 'resourceMapper',
-	default: {
-		mappingMode: 'defineBelow',
-		value: null,
-		matchingColumns: [],
-		schema: [],
-		attemptToConvertTypes: false,
-		convertFieldsToString: false,
-	},
-	required: true,
-	noDataExpression: true,
-	displayOptions: { show: { operation: ['create', 'update', 'performActivity'] } },
-	typeOptions: {
-		loadOptionsDependsOn: ['operation', 'moduleId.value', 'activityId.value'],
-		resourceMapper: {
-			resourceMapperMethod: 'getFormFields',
-			mode: 'add',
-			fieldWords: { singular: 'field', plural: 'fields' },
-			addAllFields: true,
-			supportAutoMap: true,
-			multiKeyMatch: false,
-			allowEmptyValues: true,
-		},
-	},
-};
+	entryOperationOptions,
+	entryOperationProperties,
+	executeEntryAction,
+} from './actions/entry';
+import { moduleProperty, workspaceProperty } from './actions/entry/properties';
+import { listSearch, resourceMapping } from '../shared/GenericFunctions';
+import type { P0Operation } from '../shared/Inistate.contract';
 
 export class Inistate implements INodeType {
 	description: INodeTypeDescription = {
@@ -176,66 +50,12 @@ export class Inistate implements INodeType {
 				name: 'operation',
 				type: 'options',
 				noDataExpression: true,
-				options: [
-					{
-						name: 'Assign',
-						value: 'assign',
-						action: 'Assign an entry',
-						description: 'Assign an Inistate user and optionally set a due date',
-					},
-					{
-						name: 'Change State',
-						value: 'changeState',
-						action: 'Change an entry state',
-						description: 'Move an entry to a selected state',
-					},
-					{
-						name: 'Create',
-						value: 'create',
-						action: 'Create an entry',
-						description: 'Create an entry using its module form',
-					},
-					{
-						name: 'Perform Activity',
-						value: 'performActivity',
-						action: 'Perform an activity',
-						description: 'Perform an activity with or without form fields',
-					},
-					{
-						name: 'Update',
-						value: 'update',
-						action: 'Update an entry',
-						description: 'Update an entry using its module edit form',
-					},
-				],
+				options: entryOperationOptions,
 				default: 'create',
 			},
 			workspaceProperty,
 			moduleProperty,
-			{
-				displayName: 'Document ID',
-				name: 'documentId',
-				type: 'string',
-				default: '',
-				required: true,
-				placeholder: 'N8N-TEST00001',
-				description: 'The stable document ID of the entry',
-				displayOptions: {
-					show: { operation: ['update', 'performActivity', 'changeState', 'assign'] },
-				},
-			},
-			activityProperty,
-			stateProperty,
-			userProperty,
-			{
-				displayName: 'Due Date',
-				name: 'dueDate',
-				type: 'dateTime',
-				default: '',
-				description: 'Optional assignment due date',
-				displayOptions: { show: { operation: ['assign'] } },
-			},
-			fieldsProperty,
+			...entryOperationProperties,
 		],
 	};
 
@@ -254,58 +74,13 @@ export class Inistate implements INodeType {
 				const moduleId = String(
 					this.getNodeParameter('moduleId', itemIndex, '', { extractValue: true }),
 				);
-				const actionInput: ActionRequestInput = { operation, moduleId };
-				if (operation !== 'create') {
-					actionInput.documentId = String(
-						this.getNodeParameter('documentId', itemIndex),
-					);
-				}
-				if (operation === 'create' || operation === 'update' || operation === 'performActivity') {
-					actionInput.fields = this.getNodeParameter(
-						'fields',
-						itemIndex,
-					) as ResourceMapperValue;
-				}
-				if (operation === 'update') {
-					const selectedFields = getMappedFieldValues(actionInput.fields);
-					if (Object.keys(selectedFields).length === 0) {
-						throw new NodeOperationError(
-							this.getNode(),
-							new Error('Select at least one field to update'),
-							{ itemIndex },
-						);
-					}
-					const currentFields = await getCurrentEntryFields(
-						this,
-						workspaceId,
-						moduleId,
-						actionInput.documentId ?? '',
-					);
-					actionInput.fields = { ...currentFields, ...selectedFields };
-				}
-				if (operation === 'performActivity') {
-					actionInput.activityId = String(
-						this.getNodeParameter('activityId', itemIndex, '', { extractValue: true }),
-					);
-				}
-				if (operation === 'changeState') {
-					actionInput.stateName = String(
-						this.getNodeParameter('stateName', itemIndex, '', { extractValue: true }),
-					);
-				}
-				if (operation === 'assign') {
-					actionInput.username = String(
-						this.getNodeParameter('username', itemIndex, '', { extractValue: true }),
-					);
-					actionInput.dueDate = String(this.getNodeParameter('dueDate', itemIndex, ''));
-				}
-				const requestOptions: IHttpRequestOptions = {
-					method: 'POST',
-					url: '/api/activity/',
-					headers: buildApiHeaders(workspaceId),
-					body: buildActionBody(actionInput),
-				};
-				const response = await inistateApiRequest(this, requestOptions);
+				const response = await executeEntryAction(
+					this,
+					operation,
+					itemIndex,
+					workspaceId,
+					moduleId,
+				);
 				returnData.push({
 					json: normalizeResponse(response),
 					pairedItem: { item: itemIndex },

@@ -43,6 +43,36 @@ For delivery testing, App02 must be able to reach the webhook URL shown by n8n. 
 `localhost`, `127.0.0.1`, or a private-only hostname is not reachable from App02; expose the local
 instance through a controlled HTTPS tunnel or use a publicly reachable test n8n instance.
 
+## Source organization
+
+n8n registers two package entry points: the action node and the trigger node. Their implementations
+are split by operation and event so contributors can locate each feature without searching through
+one large source file:
+
+```text
+nodes/
+├── Inistate/
+│   ├── Inistate.node.ts                 # Action-node metadata and router
+│   └── actions/entry/
+│       ├── assign.operation.ts
+│       ├── changeState.operation.ts
+│       ├── create.operation.ts
+│       ├── performActivity.operation.ts
+│       └── update.operation.ts
+├── InistateTrigger/
+│   ├── InistateTrigger.node.ts          # Trigger metadata and webhook receiver
+│   ├── events/
+│   │   ├── activityPerformed.event.ts
+│   │   ├── entryCreated.event.ts
+│   │   └── entryUpdated.event.ts
+│   └── webhook/lifecycle.ts             # Registration, existence check, and removal
+└── shared/                              # API helpers and Inistate request contracts
+```
+
+This layout is a project convention rather than an n8n restriction. `package.json` continues to
+register only `Inistate.node.js` and `InistateTrigger.node.js`; the routers import the internal
+operation and event modules.
+
 ## Supporting selectors
 
 The nodes provide Name-or-ID selectors for Workspace, Module, Activity, Field, State, and User.

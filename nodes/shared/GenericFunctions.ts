@@ -6,6 +6,7 @@ import type {
 	IHttpRequestOptions,
 	ILoadOptionsFunctions,
 	INodeListSearchResult,
+	INodePropertyOptions,
 	ResourceMapperFields,
 } from 'n8n-workflow';
 
@@ -13,8 +14,10 @@ import {
 	APP02_BASE_URL,
 	buildApiHeaders,
 	extractCollection,
+	extractFormElements,
 	getFormDefaultValues,
 	mapFormFields,
+	toReferenceFieldOptions,
 	toFieldSearchItems,
 	toSearchItems,
 } from './Inistate.contract';
@@ -254,7 +257,55 @@ export const resourceMapping = {
 					? 'edit'
 					: 'create';
 		const response = await getModuleForm(this, workspaceId, moduleId, activityId);
-		const fields = mapFormFields(response);
+		const referenceOptions = Object.fromEntries(
+			await Promise.all(
+				extractFormElements(response)
+					.filter((element) => [7, 20].includes(Number(element.type)))
+					.map(async (element) => {
+						const fieldName = String(element.fieldName ?? '');
+						const fieldId = element.id;
+						const fieldType = Number(element.type);
+						if (!fieldName || (typeof fieldId !== 'string' && typeof fieldId !== 'number')) {
+							return [fieldName, []] as const;
+						}
+
+						const options: INodePropertyOptions[] = [];
+						const seen = new Set<string>();
+						for (let currentPage = 0; currentPage < 10; currentPage++) {
+							const selectionResponse = await inistateApiRequest(this, {
+								method: 'POST',
+								url: '/api/activity/formselection',
+								headers: buildApiHeaders(workspaceId, false),
+								body: {
+									activityId,
+									text: '',
+									currentPage,
+									vectorId: /^\d+$/.test(moduleId) ? Number(moduleId) : moduleId,
+									fieldId,
+									reference: null,
+									documentId: '',
+								},
+							});
+							const pageOptions = toReferenceFieldOptions(fieldType, selectionResponse);
+							let added = 0;
+							for (const option of pageOptions) {
+								const value = String(option.value);
+								if (!seen.has(value)) {
+									seen.add(value);
+									options.push(option);
+									added++;
+								}
+							}
+							if (pageOptions.length === 0 || added === 0) {
+								break;
+							}
+						}
+
+						return [fieldName, options] as const;
+					}),
+			),
+		);
+		const fields = mapFormFields(response, referenceOptions);
 
 		return {
 			fields,

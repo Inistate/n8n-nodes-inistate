@@ -1,6 +1,7 @@
 import type {
 	IDataObject,
 	INodeListSearchItems,
+	INodePropertyOptions,
 	ResourceMapperField,
 	ResourceMapperValue,
 } from 'n8n-workflow';
@@ -12,6 +13,8 @@ export type P0Operation = 'create' | 'update' | 'performActivity' | 'changeState
 export type P0TriggerEvent = 'entryCreated' | 'entryUpdated' | 'activityPerformed';
 
 type UnknownRecord = Record<string, unknown>;
+
+const REFERENCE_VALUE_PREFIX = '__inistate_reference__:';
 
 export interface ActionRequestInput {
 	operation: P0Operation;
@@ -41,12 +44,17 @@ export function getMappedFieldValues(
 		return {};
 	}
 
+	let values: IDataObject;
 	if ('mappingMode' in fields || 'matchingColumns' in fields || 'schema' in fields) {
 		const value = (fields as ResourceMapperValue).value;
-		return value && typeof value === 'object' ? { ...value } : {};
+		values = value && typeof value === 'object' ? { ...value } : {};
+	} else {
+		values = { ...fields };
 	}
 
-	return { ...fields };
+	return Object.fromEntries(
+		Object.entries(values).flatMap(([key, value]) => expandMappedField(key, value)),
+	) as IDataObject;
 }
 
 export function buildActionBody(input: ActionRequestInput): IDataObject {
@@ -250,7 +258,10 @@ export function extractFormElements(response: unknown): UnknownRecord[] {
 	return elements;
 }
 
-export function mapFormFields(response: unknown): ResourceMapperField[] {
+export function mapFormFields(
+	response: unknown,
+	referenceOptions: Record<string, INodePropertyOptions[]> = {},
+): ResourceMapperField[] {
 	const fields: ResourceMapperField[] = [];
 	const seen = new Set<string>();
 
@@ -283,23 +294,71 @@ export function mapFormFields(response: unknown): ResourceMapperField[] {
 		};
 
 		if (mappedType === 'options') {
-			field.options = extractCollection(element.optionList).flatMap((option) => {
-				if (!isRecord(option)) {
-					return [];
-				}
+			field.options = [7, 20].includes(numericType)
+				? (referenceOptions[id] ?? [])
+				: extractCollection(element.optionList).flatMap((option) => {
+						if (!isRecord(option)) {
+							return [];
+						}
 
-				const optionValue = firstPrimitive(option, ['name', 'value', 'id']);
-				const optionName = firstPrimitive(option, ['name', 'displayName', 'value', 'id']);
-				return optionValue === undefined || optionName === undefined
-					? []
-					: [{ name: String(optionName), value: String(optionValue) }];
-			});
+						const optionValue = firstPrimitive(option, ['name', 'value', 'id']);
+						const optionName = firstPrimitive(option, ['name', 'displayName', 'value', 'id']);
+						return optionValue === undefined || optionName === undefined
+							? []
+							: [{ name: String(optionName), value: String(optionValue) }];
+					});
 		}
 
 		fields.push(field);
 	}
 
 	return fields;
+}
+
+export function toReferenceFieldOptions(
+	fieldType: number,
+	response: unknown,
+): INodePropertyOptions[] {
+	if (![7, 20].includes(fieldType)) {
+		return [];
+	}
+
+	const options: INodePropertyOptions[] = [];
+	const seen = new Set<string>();
+	for (const candidate of extractCollection(response)) {
+		if (!isRecord(candidate)) {
+			continue;
+		}
+
+		const id = firstPrimitive(candidate, ['id', 'entryId', 'entityId']);
+		const name = firstPrimitive(candidate, [
+			'value',
+			'optionName',
+			'name',
+			'displayName',
+			'documentId',
+			'username',
+		]);
+		const username = firstPrimitive(candidate, ['username']);
+		if (id === undefined || name === undefined || (fieldType === 20 && username === undefined)) {
+			continue;
+		}
+
+		const reference = {
+			id,
+			name: String(name),
+			...(fieldType === 20 ? { username: String(username) } : {}),
+		};
+		const value = `${REFERENCE_VALUE_PREFIX}${JSON.stringify(reference)}`;
+		if (seen.has(value)) {
+			continue;
+		}
+
+		seen.add(value);
+		options.push({ name: String(name), value });
+	}
+
+	return options;
 }
 
 export function getFormDefaultValues(response: unknown): IDataObject {
@@ -323,8 +382,7 @@ export function getFormDefaultValues(response: unknown): IDataObject {
 			continue;
 		}
 		const defaultKey = [elementId, fieldName].find(
-			(key) =>
-				key !== undefined && Object.prototype.hasOwnProperty.call(defaults, String(key)),
+			(key) => key !== undefined && Object.prototype.hasOwnProperty.call(defaults, String(key)),
 		);
 		if (defaultKey !== undefined) {
 			values[String(fieldName)] = defaults[String(defaultKey)] as IDataObject[string];
@@ -364,6 +422,33 @@ function firstPrimitive(
 	return undefined;
 }
 
+function expandMappedField(key: string, value: unknown): Array<[string, unknown]> {
+	if (typeof value !== 'string' || !value.startsWith(REFERENCE_VALUE_PREFIX)) {
+		return [[key, value]];
+	}
+
+	try {
+		const decoded = JSON.parse(value.slice(REFERENCE_VALUE_PREFIX.length)) as unknown;
+		if (
+			!isRecord(decoded) ||
+			(typeof decoded.id !== 'string' && typeof decoded.id !== 'number') ||
+			typeof decoded.name !== 'string'
+		) {
+			return [[key, value]];
+		}
+
+		return [
+			[key, decoded.name],
+			[`${key}Id`, decoded.id],
+			...(typeof decoded.username === 'string'
+				? ([[`${key}Username`, decoded.username]] as Array<[string, unknown]>)
+				: []),
+		];
+	} catch {
+		return [[key, value]];
+	}
+}
+
 function collectDesignElements(value: unknown, elements: UnknownRecord[]): void {
 	if (!isRecord(value) || !Array.isArray(value.rows)) {
 		return;
@@ -400,7 +485,7 @@ function collectDesignElements(value: unknown, elements: UnknownRecord[]): void 
 }
 
 function mapFieldType(type: number): ResourceMapperField['type'] | undefined {
-	if ([0, 7, 16, 20, 22, 25, 26, 33].includes(type)) {
+	if ([0, 16, 22, 25, 26, 33].includes(type)) {
 		return 'string';
 	}
 
@@ -416,7 +501,7 @@ function mapFieldType(type: number): ResourceMapperField['type'] | undefined {
 		return 'dateTime';
 	}
 
-	if (type === 27) {
+	if ([7, 20, 27].includes(type)) {
 		return 'options';
 	}
 

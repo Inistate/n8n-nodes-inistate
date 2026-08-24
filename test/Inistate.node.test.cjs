@@ -335,3 +335,143 @@ test('implements Workspace, Module, Activity, Field, State, and User selectors',
 	assert.deepEqual(formRequest.headers, { wsId: '2307' });
 	assert.deepEqual(formRequest.body, { vectorId: '19296', activityId: 'activity-1' });
 });
+
+test('loads Module and User form fields as dropdown options', async () => {
+	const requests = [];
+	const context = createLoadContext(
+		{
+			workspaceId: { value: '2307' },
+			moduleId: { value: '19305' },
+			operation: 'create',
+			documentId: '',
+		},
+		(options) => {
+			if (options.url.endsWith('/api/Activity/Form')) {
+				return {
+					classificationForm: {
+						design: {
+							rows: [
+								{
+									items: [
+										{
+											id: 'project-id',
+											fieldName: 'relatedProject',
+											displayName: 'Related Project',
+											type: 7,
+										},
+										{
+											id: 'assignee-id',
+											fieldName: 'assignee',
+											displayName: 'Assignee',
+											type: 20,
+										},
+									],
+								},
+							],
+						},
+					},
+				};
+			}
+			if (options.url.endsWith('/api/activity/formselection')) {
+				if (options.body.currentPage > 0) return [];
+				if (options.body.fieldId === 'project-id') {
+					return [{ id: 806568, value: 'N8N Sandbox Project' }];
+				}
+				if (options.body.fieldId === 'assignee-id') {
+					return [{ id: 806569, value: 'N8N Test User One', username: 'n8n.test.user1' }];
+				}
+			}
+
+			throw new Error(`Unexpected test URL: ${options.url}`);
+		},
+		requests,
+	);
+
+	const result = await resourceMapping.getFormFields.call(context);
+	assert.deepEqual(
+		result.fields.map(({ id, type, options }) => ({
+			id,
+			type,
+			optionNames: options?.map(({ name }) => name),
+		})),
+		[
+			{
+				id: 'relatedProject',
+				type: 'options',
+				optionNames: ['N8N Sandbox Project'],
+			},
+			{
+				id: 'assignee',
+				type: 'options',
+				optionNames: ['N8N Test User One'],
+			},
+		],
+	);
+	const selectionRequests = requests.filter(({ options }) =>
+		options.url.endsWith('/api/activity/formselection'),
+	);
+	assert.equal(selectionRequests.length, 4);
+	assert.deepEqual(selectionRequests[0].options.headers, { wsId: '2307' });
+	assert.deepEqual(selectionRequests[0].options.body, {
+		activityId: 'create',
+		text: '',
+		currentPage: 0,
+		vectorId: 19305,
+		fieldId: 'project-id',
+		reference: null,
+		documentId: '',
+	});
+});
+
+test('does not pass an entry document ID when loading custom-activity reference options', async () => {
+	const requests = [];
+	const context = createLoadContext(
+		{
+			workspaceId: { value: '2307' },
+			moduleId: { value: '19305' },
+			operation: 'performActivity',
+			activityId: { value: 'activity-1' },
+			documentId: 'N8N00005',
+		},
+		(options) => {
+			if (options.url.endsWith('/api/Activity/Form')) {
+				return {
+					classificationForm: {
+						design: {
+							rows: [
+								{
+									items: [
+										{
+											id: 'project-id',
+											fieldName: 'relatedProject',
+											displayName: 'Related Project',
+											type: 7,
+										},
+									],
+								},
+							],
+						},
+					},
+				};
+			}
+			if (options.url.endsWith('/api/activity/formselection')) {
+				if (options.body.currentPage > 0) return [];
+				return options.body.documentId === '' ? [{ id: 806568, value: 'N8N Sandbox Project' }] : [];
+			}
+
+			throw new Error(`Unexpected test URL: ${options.url}`);
+		},
+		requests,
+	);
+
+	const result = await resourceMapping.getFormFields.call(context);
+	assert.deepEqual(
+		result.fields[0].options?.map(({ name }) => name),
+		['N8N Sandbox Project'],
+	);
+	const selectionRequest = requests.find(({ options }) =>
+		options.url.endsWith('/api/activity/formselection'),
+	);
+	assert.equal(selectionRequest.options.body.activityId, 'activity-1');
+	assert.equal(selectionRequest.options.body.documentId, '');
+});

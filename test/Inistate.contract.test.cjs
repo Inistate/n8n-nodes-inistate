@@ -12,6 +12,7 @@ const {
 	getTriggerItem,
 	mapFormFields,
 	toFieldSearchItems,
+	toReferenceFieldOptions,
 	toSearchItems,
 } = require('../dist/nodes/shared/Inistate.contract.js');
 
@@ -31,6 +32,35 @@ test('extracts only resource-mapper field values', () => {
 			convertFieldsToString: false,
 		}),
 		{ title: 'N8N-TEST task', priority: 'High' },
+	);
+});
+
+test('maps reference selections to flat Inistate activity payload fields', () => {
+	const moduleOptions = toReferenceFieldOptions(7, [{ id: 806568, value: 'N8N Sandbox Project' }]);
+	const userOptions = toReferenceFieldOptions(20, [
+		{ id: 806569, value: 'N8N Test User One', username: 'n8n.test.user1' },
+	]);
+
+	assert.deepEqual(
+		moduleOptions.map(({ name }) => name),
+		['N8N Sandbox Project'],
+	);
+	assert.deepEqual(
+		userOptions.map(({ name }) => name),
+		['N8N Test User One'],
+	);
+	assert.deepEqual(
+		getMappedFieldValues({
+			'Related Project': moduleOptions[0].value,
+			Assignee: userOptions[0].value,
+		}),
+		{
+			'Related Project': 'N8N Sandbox Project',
+			'Related ProjectId': 806568,
+			Assignee: 'N8N Test User One',
+			AssigneeId: 806569,
+			AssigneeUsername: 'n8n.test.user1',
+		},
 	);
 });
 
