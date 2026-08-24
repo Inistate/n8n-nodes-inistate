@@ -11,10 +11,10 @@ import type {
 } from 'n8n-workflow';
 
 import {
-	APP02_BASE_URL,
 	buildApiHeaders,
 	extractCollection,
 	extractFormElements,
+	getInistateBaseUrl,
 	getFormDefaultValues,
 	mapFormFields,
 	toReferenceFieldOptions,
@@ -28,12 +28,15 @@ export async function inistateApiRequest(
 	context: InistateRequestFunctions,
 	options: IHttpRequestOptions,
 ): Promise<unknown> {
+	const credentials = await context.getCredentials('inistateApi');
+	const baseUrl = getInistateBaseUrl(credentials.environment);
+
 	return await context.helpers.httpRequestWithAuthentication.call(
 		context as IAllExecuteFunctions,
 		'inistateApi',
 		{
 			...options,
-			url: options.url.startsWith('http') ? options.url : `${APP02_BASE_URL}${options.url}`,
+			url: options.url.startsWith('http') ? options.url : `${baseUrl}${options.url}`,
 			json: true,
 		},
 	);

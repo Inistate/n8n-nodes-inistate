@@ -18,6 +18,7 @@ function createHookContext(
 	};
 
 	return {
+		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
 		getWorkflowStaticData: () => staticData,
 		getNodeWebhookUrl: () => 'https://n8n.example/webhook/inistate',
 		getNodeParameter(name, fallback, options) {

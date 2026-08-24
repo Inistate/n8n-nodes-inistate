@@ -50,6 +50,7 @@ test('executes two input items independently with explicit payloads and paired o
 		},
 	];
 	const context = {
+		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
 		getInputData: () => [{ json: { source: 1 } }, { json: { source: 2 } }],
 		getNodeParameter(name, itemIndex, fallback, options) {
 			const value = parameters[itemIndex][name] ?? fallback;
@@ -168,6 +169,7 @@ test('does not read operation-specific properties hidden from Create', async () 
 		},
 	};
 	const context = {
+		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
 		getInputData: () => [{ json: {} }],
 		getNodeParameter(name, _itemIndex, _fallback, options) {
 			if (!Object.prototype.hasOwnProperty.call(parameters, name)) {
@@ -211,6 +213,7 @@ test('executes Delete and Duplicate with the Zapier-compatible activity contract
 		},
 	];
 	const context = {
+		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
 		getInputData: () => [{ json: {} }, { json: {} }],
 		getNodeParameter(name, itemIndex, fallback, options) {
 			return extractParameter(parameters[itemIndex][name] ?? fallback, options);
@@ -244,6 +247,7 @@ test('executes Delete and Duplicate with the Zapier-compatible activity contract
 test('returns a per-item error when Continue On Fail is enabled', async () => {
 	const node = new Inistate();
 	const context = {
+		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
 		getInputData: () => [{ json: {} }],
 		getNodeParameter(name, _itemIndex, fallback, options) {
 			const values = {
@@ -275,6 +279,7 @@ test('returns a per-item error when Continue On Fail is enabled', async () => {
 
 function createLoadContext(parameters, responder, requests) {
 	return {
+		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
 		getNodeParameter(name, fallback, options) {
 			return extractParameter(parameters[name] ?? fallback, options);
 		},

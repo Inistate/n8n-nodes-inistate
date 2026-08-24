@@ -7,6 +7,11 @@ import type {
 } from 'n8n-workflow';
 
 export const APP02_BASE_URL = 'https://app02.apps.inistate.com';
+export const INISTATE_BASE_URL = 'https://api.inistate.com';
+
+export function getInistateBaseUrl(environment: unknown): string {
+	return environment === 'app02' ? APP02_BASE_URL : INISTATE_BASE_URL;
+}
 
 export type P0Operation = 'create' | 'update' | 'performActivity' | 'changeState' | 'assign';
 

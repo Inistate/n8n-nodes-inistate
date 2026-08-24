@@ -1,9 +1,12 @@
 import type {
-	IAuthenticateGeneric,
+	IAuthenticate,
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
 } from 'n8n-workflow';
+
+const APP02_ENVIRONMENT = 'app02';
+const INISTATE_EMAIL_SUFFIX = '@inistate.com';
 
 export class InistateApi implements ICredentialType {
 	name = 'inistateApi';
@@ -16,38 +19,73 @@ export class InistateApi implements ICredentialType {
 
 	properties: INodeProperties[] = [
 		{
-			displayName: 'API Key',
-			name: 'apiKey',
-			type: 'string',
-			typeOptions: { password: true },
-			default: '',
-			required: true,
-			description: 'API key used to authenticate with the App02 Inistate API',
-		},
-		{
 			displayName: 'Inistate Username',
 			name: 'username',
 			type: 'string',
 			default: '',
 			required: true,
 			placeholder: 'name@example.com',
+			description: 'Username returned by the Inistate profile, normally your email address',
+		},
+		{
+			displayName: 'Environment',
+			name: 'environment',
+			type: 'options',
+			options: [
+				{
+					name: 'Inistate',
+					value: 'production',
+					description: 'Connect to Inistate',
+				},
+				{
+					name: 'App02',
+					value: APP02_ENVIRONMENT,
+					description: 'Connect to the internal App02',
+				},
+			],
+			default: 'production',
+			displayOptions: {
+				show: {
+					username: [{ _cnd: { endsWith: INISTATE_EMAIL_SUFFIX } }],
+				},
+			},
 			description:
-				'Username for identifying this Inistate connection. It is not sent to the API for authentication.',
+				'API environment. App02 is available only when the username ends with @inistate.com.',
+		},
+		{
+			displayName: 'API Key',
+			name: 'apiKey',
+			type: 'string',
+			typeOptions: { password: true },
+			default: '',
+			required: true,
+			description: 'API key used to authenticate with the selected Inistate environment',
 		},
 	];
 
-	authenticate: IAuthenticateGeneric = {
-		type: 'generic',
-		properties: {
+	authenticate: IAuthenticate = async (credentials, requestOptions) => {
+		const environment = String(credentials.environment ?? 'production');
+		const username = String(credentials.username ?? '')
+			.trim()
+			.toLowerCase();
+
+		if (environment === APP02_ENVIRONMENT && !username.endsWith(INISTATE_EMAIL_SUFFIX)) {
+			throw new Error('App02 can only be selected for an @inistate.com username');
+		}
+
+		return {
+			...requestOptions,
 			headers: {
-				Authorization: '=fsk {{$credentials.apiKey}}',
+				...(requestOptions.headers ?? {}),
+				Authorization: `fsk ${String(credentials.apiKey ?? '')}`,
 			},
-		},
+		};
 	};
 
 	test: ICredentialTestRequest = {
 		request: {
-			baseURL: 'https://app02.apps.inistate.com',
+			baseURL:
+				'={{$credentials.environment === "app02" ? "https://app02.apps.inistate.com" : "https://api.inistate.com"}}',
 			url: '/api/profile',
 			method: 'GET',
 		},

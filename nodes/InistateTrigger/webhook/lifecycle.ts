@@ -3,7 +3,6 @@ import { NodeOperationError } from 'n8n-workflow';
 
 import { inistateApiRequest } from '../../shared/GenericFunctions';
 import {
-	APP02_BASE_URL,
 	buildApiHeaders,
 	buildSubscription,
 	getWebhookId,
@@ -32,7 +31,7 @@ export const webhookMethods = {
 			const subscription = getTriggerSubscriptionForEvent(this, event);
 			const requestOptions: IHttpRequestOptions = {
 				method: 'POST',
-				url: `${APP02_BASE_URL}/api/automationHook`,
+				url: '/api/automationHook',
 				headers: buildApiHeaders(workspaceId),
 				body: buildSubscription(
 					moduleId,
@@ -67,7 +66,7 @@ export const webhookMethods = {
 			const webhookId = String(webhookData.webhookId);
 			const requestOptions: IHttpRequestOptions = {
 				method: 'GET',
-				url: `${APP02_BASE_URL}/api/automationHook/delete/${encodeURIComponent(webhookId)}`,
+				url: `/api/automationHook/delete/${encodeURIComponent(webhookId)}`,
 				headers: buildApiHeaders(workspaceId, false),
 				json: true,
 			};

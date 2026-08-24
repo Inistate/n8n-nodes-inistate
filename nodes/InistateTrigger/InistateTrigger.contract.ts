@@ -1,6 +1,6 @@
 import type { IDataObject } from 'n8n-workflow';
 
-export { APP02_BASE_URL, getWebhookId } from '../shared/Inistate.contract';
+export { APP02_BASE_URL, INISTATE_BASE_URL, getWebhookId } from '../shared/Inistate.contract';
 
 import { buildApiHeaders, buildSubscription } from '../shared/Inistate.contract';
 

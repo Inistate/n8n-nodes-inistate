@@ -42,8 +42,8 @@ export class InistateTrigger implements INodeType {
 		],
 		properties: [
 			{
-				displayName: 'This P0 node connects only to the App02 API environment.',
-				name: 'app02Notice',
+				displayName: 'The API environment is selected in the Inistate credential.',
+				name: 'environmentNotice',
 				type: 'notice',
 				default: '',
 			},

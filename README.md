@@ -3,8 +3,8 @@
 Community nodes for using Inistate entries and business events in n8n workflows.
 
 > **P0 status:** release candidate under sandbox verification. Version `0.1.0` is not yet
-> published. P0 connects only to `https://app02.apps.inistate.com`; other Inistate hosts are
-> intentionally deferred.
+> published. Credentials default to `https://api.inistate.com`; Inistate staff can select the
+> `https://app02.apps.inistate.com` test environment.
 >
 > **P1 status:** Delete, Duplicate, and State Changed are implemented as release candidates. Their
 > automated contracts pass, but they are not approved until the destructive action and complete
@@ -46,9 +46,10 @@ The trigger provides three protected P0 events and one P1 release-candidate even
 Activation registers a hook with Inistate. Deactivation removes that hook. A delivered webhook JSON
 body is emitted directly as the n8n output item.
 
-For delivery testing, App02 must be able to reach the webhook URL shown by n8n. A URL containing
-`localhost`, `127.0.0.1`, or a private-only hostname is not reachable from App02; expose the local
-instance through a controlled HTTPS tunnel or use a publicly reachable test n8n instance.
+For delivery testing, the selected Inistate environment must be able to reach the webhook URL shown
+by n8n. A URL containing `localhost`, `127.0.0.1`, or a private-only hostname is not reachable from
+the hosted APIs; expose the local instance through a controlled HTTPS tunnel or use a publicly
+reachable test n8n instance.
 
 ## Source organization
 
@@ -93,14 +94,19 @@ their distinct existing Inistate API contracts.
 
 ## Credentials
 
-Create an **Inistate API** credential and enter an App02 API key and your Inistate username (normally
-your email address). The username identifies the saved connection in the credential form; matching
-Zapier, it is not sent to Inistate or validated as part of authentication. n8n stores the key in its
-encrypted credential store and sends it as `Authorization: fsk <API key>`. The key is never a
-workflow parameter. The credential test calls:
+Create an **Inistate API** credential and enter your Inistate username (normally your email address)
+and API key. The default environment is **Inistate**, which uses `https://api.inistate.com`. When the
+username ends with `@inistate.com`, the credential form also shows the **App02** test environment at
+`https://app02.apps.inistate.com`. App02 is rejected at request time for other usernames. This is a
+client-side product restriction; the selected API still performs the authoritative API-key check.
+
+n8n stores the key in its encrypted credential store and sends it as
+`Authorization: fsk <API key>`. The key is never a workflow parameter. The credential test calls
+`GET /api/profile` on the selected environment:
 
 ```text
-GET https://app02.apps.inistate.com/api/profile
+GET https://api.inistate.com/api/profile
+GET https://app02.apps.inistate.com/api/profile (App02 selection)
 ```
 
 Use a dedicated non-production API key with only the permissions needed for the test workspace. Do
@@ -179,8 +185,8 @@ n8n if requested. Community-node installation availability depends on the n8n de
 
 ## P0 limitations
 
-- The API host is fixed to App02. Production, internal, customer-managed on-premise, and arbitrary
-  custom hosts are not supported in P0.
+- The supported API hosts are Inistate Production and App02. Customer-managed on-premise and
+  arbitrary custom hosts are not supported in P0.
 - Webhook authenticity cannot be cryptographically verified because the current Inistate hook
   contract does not expose a signing secret or signature header.
 - Workspace discovery uses the legacy page-based endpoint; all other selectors are scoped to the

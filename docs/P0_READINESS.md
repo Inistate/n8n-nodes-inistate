@@ -35,8 +35,8 @@ Status meanings:
 Run evidence:
 
 ```text
-node --test --test-force-exit test/**/*.test.cjs (against the active dev watch build)
-31 tests, 31 passed, 0 failed
+node --test --test-force-exit test/**/*.test.cjs
+33 tests, 33 passed, 0 failed
 
 npx tsc --noEmit
 exit code 0
@@ -53,7 +53,7 @@ runtime included
 
 | Requirement                                          | Status                 | Evidence or blocker                                                                                                          |
 | ---------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Fixed App02 P0 URL                                   | Confirmed              | `https://app02.apps.inistate.com` in credential and request contracts                                                        |
+| Production/App02 host selection                     | Partial                | Automated routing passes; App02 is live-tested, but Production has not yet had the same live smoke test                      |
 | `GET /api/profile` with intended key                 | Confirmed by requester | Credential test previously succeeded                                                                                         |
 | Dedicated sandbox                                    | Confirmed              | `N8N Node Testing` workspace `2307`; `P0 Task Tracker` module `19296`                                                        |
 | Representative basic field types                     | Confirmed              | Text, MultiText, Selection, Number, Date, DateTime, YesNo present                                                            |

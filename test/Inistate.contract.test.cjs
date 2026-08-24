@@ -7,6 +7,7 @@ const {
 	buildSubscription,
 	extractCollection,
 	extractFormElements,
+	getInistateBaseUrl,
 	getFormDefaultValues,
 	getMappedFieldValues,
 	getTriggerItem,
@@ -15,6 +16,12 @@ const {
 	toReferenceFieldOptions,
 	toSearchItems,
 } = require('../dist/nodes/shared/Inistate.contract.js');
+
+test('selects Production by default and App02 only when requested', () => {
+	assert.equal(getInistateBaseUrl(undefined), 'https://api.inistate.com');
+	assert.equal(getInistateBaseUrl('production'), 'https://api.inistate.com');
+	assert.equal(getInistateBaseUrl('app02'), 'https://app02.apps.inistate.com');
+});
 
 test('builds activity headers with the n8n medium and metadata headers without it', () => {
 	assert.deepEqual(buildApiHeaders('2307'), { wsId: '2307', medium: 'n8n' });
