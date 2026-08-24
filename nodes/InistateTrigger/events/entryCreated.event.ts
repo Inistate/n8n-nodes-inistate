@@ -8,7 +8,7 @@ export const entryCreatedEvent: TriggerEventDefinition = {
 		description: 'Runs when an entry is created',
 	},
 	properties: [],
-	getItem() {
-		return 'create';
+	getSubscription() {
+		return { item: 'create', trigger: 'execute', type: 'activity' };
 	},
 };

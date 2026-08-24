@@ -7,6 +7,10 @@ const {
 	changeStateAction,
 } = require('../dist/nodes/Inistate/actions/entry/changeState.operation.js');
 const { createEntryAction } = require('../dist/nodes/Inistate/actions/entry/create.operation.js');
+const { deleteEntryAction } = require('../dist/nodes/Inistate/actions/entry/delete.operation.js');
+const {
+	duplicateEntryAction,
+} = require('../dist/nodes/Inistate/actions/entry/duplicate.operation.js');
 const {
 	performActivityAction,
 } = require('../dist/nodes/Inistate/actions/entry/performActivity.operation.js');
@@ -17,12 +21,15 @@ const {
 } = require('../dist/nodes/InistateTrigger/events/activityPerformed.event.js');
 const { entryCreatedEvent } = require('../dist/nodes/InistateTrigger/events/entryCreated.event.js');
 const { entryUpdatedEvent } = require('../dist/nodes/InistateTrigger/events/entryUpdated.event.js');
+const { stateChangedEvent } = require('../dist/nodes/InistateTrigger/events/stateChanged.event.js');
 
-test('advertises exactly the five action modules registered by the action node', () => {
+test('advertises exactly the seven action modules registered by the action node', () => {
 	const definitions = [
 		assignEntryAction,
 		changeStateAction,
 		createEntryAction,
+		deleteEntryAction,
+		duplicateEntryAction,
 		performActivityAction,
 		updateEntryAction,
 	];
@@ -32,7 +39,7 @@ test('advertises exactly the five action modules registered by the action node',
 
 	assert.deepEqual(
 		definitions.map(({ operation }) => operation),
-		['assign', 'changeState', 'create', 'performActivity', 'update'],
+		['assign', 'changeState', 'create', 'delete', 'duplicate', 'performActivity', 'update'],
 	);
 	assert.deepEqual(
 		operationProperty.options.map(({ value }) => value),
@@ -47,6 +54,8 @@ test('advertises exactly the five action modules registered by the action node',
 		assign: ['documentId', 'username', 'dueDate'],
 		changeState: ['documentId', 'stateName'],
 		create: ['fields'],
+		delete: ['deleteWarning', 'documentId'],
+		duplicate: ['documentId'],
 		performActivity: ['documentId', 'activityId', 'fields'],
 		update: ['documentId', 'fields'],
 	};
@@ -59,15 +68,20 @@ test('advertises exactly the five action modules registered by the action node',
 	}
 });
 
-test('advertises exactly the three event modules registered by the trigger node', () => {
-	const definitions = [activityPerformedEvent, entryCreatedEvent, entryUpdatedEvent];
+test('advertises exactly the four event modules registered by the trigger node', () => {
+	const definitions = [
+		activityPerformedEvent,
+		entryCreatedEvent,
+		entryUpdatedEvent,
+		stateChangedEvent,
+	];
 	const eventProperty = new InistateTrigger().description.properties.find(
 		(property) => property.name === 'event',
 	);
 
 	assert.deepEqual(
 		definitions.map(({ event }) => event),
-		['activityPerformed', 'entryCreated', 'entryUpdated'],
+		['activityPerformed', 'entryCreated', 'entryUpdated', 'stateChanged'],
 	);
 	assert.deepEqual(
 		eventProperty.options.map(({ value }) => value),
@@ -76,4 +90,11 @@ test('advertises exactly the three event modules registered by the trigger node'
 	for (const definition of definitions) {
 		assert.equal(definition.option.value, definition.event);
 	}
+	assert.equal(eventProperty.displayName, 'Trigger On');
+	assert.deepEqual(
+		new InistateTrigger().description.properties
+			.filter((property) => property.displayOptions?.show?.event?.includes('stateChanged'))
+			.map(({ name }) => name),
+		['stateChangeDirection', 'stateId'],
+	);
 });

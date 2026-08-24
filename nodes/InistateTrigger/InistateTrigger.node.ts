@@ -48,7 +48,7 @@ export class InistateTrigger implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Event',
+				displayName: 'Trigger On',
 				name: 'event',
 				type: 'options',
 				noDataExpression: true,

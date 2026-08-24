@@ -14,7 +14,7 @@ import {
 } from './actions/entry';
 import { moduleProperty, workspaceProperty } from './actions/entry/properties';
 import { listSearch, resourceMapping } from '../shared/GenericFunctions';
-import type { P0Operation } from '../shared/Inistate.contract';
+import type { InistateOperation } from '../shared/Inistate.contract';
 
 export class Inistate implements INodeType {
 	description: INodeTypeDescription = {
@@ -67,7 +67,7 @@ export class Inistate implements INodeType {
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
-				const operation = this.getNodeParameter('operation', itemIndex) as P0Operation;
+				const operation = this.getNodeParameter('operation', itemIndex) as InistateOperation;
 				const workspaceId = String(
 					this.getNodeParameter('workspaceId', itemIndex, '', { extractValue: true }),
 				);

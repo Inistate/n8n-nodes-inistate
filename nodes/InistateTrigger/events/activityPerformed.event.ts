@@ -23,10 +23,14 @@ export const activityPerformedEvent: TriggerEventDefinition = {
 		description: 'Runs when the selected activity is performed',
 	},
 	properties: [activityProperty],
-	getItem() {
+	getSubscription() {
 		const activityId = String(
 			this.getNodeParameter('activityId', undefined, { extractValue: true }),
 		);
-		return getTriggerItem('activityPerformed', activityId);
+		return {
+			item: getTriggerItem('activityPerformed', activityId),
+			trigger: 'execute',
+			type: 'activity',
+		};
 	},
 };

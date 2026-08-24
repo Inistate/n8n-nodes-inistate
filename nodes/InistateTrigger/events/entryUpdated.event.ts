@@ -7,8 +7,17 @@ export const entryUpdatedEvent: TriggerEventDefinition = {
 		value: 'entryUpdated',
 		description: 'Runs when an entry is edited',
 	},
-	properties: [],
-	getItem() {
-		return 'edit';
+	properties: [
+		{
+			displayName:
+				'Updating an entry in this workflow can trigger another execution. Add an idempotent condition to prevent loops',
+			name: 'entryUpdatedLoopNotice',
+			type: 'notice',
+			default: '',
+			displayOptions: { show: { event: ['entryUpdated'] } },
+		},
+	],
+	getSubscription() {
+		return { item: 'edit', trigger: 'execute', type: 'activity' };
 	},
 };

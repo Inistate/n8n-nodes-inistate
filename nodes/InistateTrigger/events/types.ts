@@ -1,10 +1,16 @@
 import type { IHookFunctions, INodeProperties, INodePropertyOptions } from 'n8n-workflow';
 
-import type { P0TriggerEvent } from '../../shared/Inistate.contract';
+import type { InistateTriggerEvent } from '../../shared/Inistate.contract';
+
+export interface TriggerSubscriptionSelection {
+	item: string;
+	trigger: string;
+	type: string;
+}
 
 export interface TriggerEventDefinition {
-	event: P0TriggerEvent;
+	event: InistateTriggerEvent;
 	option: INodePropertyOptions;
 	properties: INodeProperties[];
-	getItem(this: IHookFunctions): string;
+	getSubscription(this: IHookFunctions): TriggerSubscriptionSelection;
 }

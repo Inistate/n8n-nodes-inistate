@@ -7,9 +7,9 @@ import {
 	buildApiHeaders,
 	buildSubscription,
 	getWebhookId,
-	type P0TriggerEvent,
+	type InistateTriggerEvent,
 } from '../../shared/Inistate.contract';
-import { getTriggerItemForEvent } from '../events';
+import { getTriggerSubscriptionForEvent } from '../events';
 
 export const webhookMethods = {
 	default: {
@@ -28,12 +28,19 @@ export const webhookMethods = {
 				this.getNodeParameter('workspaceId', undefined, { extractValue: true }),
 			);
 			const moduleId = String(this.getNodeParameter('moduleId', undefined, { extractValue: true }));
-			const event = this.getNodeParameter('event') as P0TriggerEvent;
+			const event = this.getNodeParameter('event') as InistateTriggerEvent;
+			const subscription = getTriggerSubscriptionForEvent(this, event);
 			const requestOptions: IHttpRequestOptions = {
 				method: 'POST',
 				url: `${APP02_BASE_URL}/api/automationHook`,
 				headers: buildApiHeaders(workspaceId),
-				body: buildSubscription(moduleId, getTriggerItemForEvent(this, event), webhookUrl),
+				body: buildSubscription(
+					moduleId,
+					subscription.item,
+					webhookUrl,
+					subscription.type,
+					subscription.trigger,
+				),
 				json: true,
 			};
 

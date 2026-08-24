@@ -134,6 +134,34 @@ test('builds all five protected P0 action request bodies', () => {
 	);
 });
 
+test('builds the two P1 action request bodies', () => {
+	assert.deepEqual(
+		buildActionBody({
+			operation: 'delete',
+			moduleId: '19296',
+			documentId: 'N8N-TEST00001',
+		}),
+		{
+			activityId: 'delete',
+			moduleId: '19296',
+			entry: 'N8N-TEST00001',
+		},
+	);
+
+	assert.deepEqual(
+		buildActionBody({
+			operation: 'duplicate',
+			moduleId: '19296',
+			documentId: 'N8N-TEST00001',
+		}),
+		{
+			activityId: 'duplicate',
+			moduleId: '19296',
+			entry: 'N8N-TEST00001',
+		},
+	);
+});
+
 test('omits an empty optional assignment due date and validates operation identifiers', () => {
 	assert.deepEqual(
 		buildActionBody({
@@ -183,6 +211,17 @@ test('builds all protected trigger subscriptions', () => {
 		channel: 'n8n',
 		url: 'https://n8n.example/webhook/id',
 	});
+	assert.deepEqual(
+		buildSubscription('19296', 'state-1', 'https://n8n.example/webhook/id', 'state', 'changeTo'),
+		{
+			moduleId: '19296',
+			item: 'state-1',
+			type: 'state',
+			trigger: 'changeTo',
+			channel: 'n8n',
+			url: 'https://n8n.example/webhook/id',
+		},
+	);
 });
 
 test('normalizes selector response shapes, filters, and de-duplicates values', () => {

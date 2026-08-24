@@ -193,6 +193,54 @@ test('does not read operation-specific properties hidden from Create', async () 
 	]);
 });
 
+test('executes Delete and Duplicate with the Zapier-compatible activity contracts', async () => {
+	const node = new Inistate();
+	const requests = [];
+	const parameters = [
+		{
+			operation: 'delete',
+			workspaceId: { value: '2307' },
+			moduleId: { value: '19296' },
+			documentId: 'N8N-TEST00001',
+		},
+		{
+			operation: 'duplicate',
+			workspaceId: { value: '2307' },
+			moduleId: { value: '19296' },
+			documentId: 'N8N-TEST00002',
+		},
+	];
+	const context = {
+		getInputData: () => [{ json: {} }, { json: {} }],
+		getNodeParameter(name, itemIndex, fallback, options) {
+			return extractParameter(parameters[itemIndex][name] ?? fallback, options);
+		},
+		helpers: {
+			async httpRequestWithAuthentication(credentialName, options) {
+				requests.push({ credentialName, options });
+				return options.body.activityId === 'delete' ? { deleted: true } : { duplicated: true };
+			},
+		},
+		continueOnFail: () => false,
+		getNode: () => ({ name: 'P1 entry action' }),
+	};
+
+	const output = await node.execute.call(context);
+	assert.deepEqual(
+		requests.map(({ options }) => options.body),
+		[
+			{ activityId: 'delete', moduleId: '19296', entry: 'N8N-TEST00001' },
+			{ activityId: 'duplicate', moduleId: '19296', entry: 'N8N-TEST00002' },
+		],
+	);
+	assert.deepEqual(output, [
+		[
+			{ json: { deleted: true }, pairedItem: { item: 0 } },
+			{ json: { duplicated: true }, pairedItem: { item: 1 } },
+		],
+	]);
+});
+
 test('returns a per-item error when Continue On Fail is enabled', async () => {
 	const node = new Inistate();
 	const context = {
@@ -239,7 +287,7 @@ function createLoadContext(parameters, responder, requests) {
 	};
 }
 
-test('implements Workspace, Module, Activity, Field, State, and User selectors', async () => {
+test('implements Workspace, Module, Activity, Field, State Name, State ID, and User selectors', async () => {
 	const requests = [];
 	const context = createLoadContext(
 		{
@@ -307,6 +355,9 @@ test('implements Workspace, Module, Activity, Field, State, and User selectors',
 	});
 	assert.deepEqual(await listSearch.searchStates.call(context), {
 		results: [{ name: 'Backlog', value: 'Backlog' }],
+	});
+	assert.deepEqual(await listSearch.searchStateIds.call(context), {
+		results: [{ name: 'Backlog', value: 'state-1' }],
 	});
 	assert.deepEqual(await listSearch.searchUsers.call(context), {
 		results: [{ name: 'Tester', value: 'tester@example.com' }],

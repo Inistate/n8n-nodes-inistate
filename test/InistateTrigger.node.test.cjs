@@ -3,12 +3,18 @@ const test = require('node:test');
 
 const { InistateTrigger } = require('../dist/nodes/InistateTrigger/InistateTrigger.node.js');
 
-function createHookContext(requests, staticData, event = 'activityPerformed') {
+function createHookContext(
+	requests,
+	staticData,
+	event = 'activityPerformed',
+	stateChangeDirection = 'changeTo',
+) {
 	const parameters = {
 		workspaceId: { value: '2307' },
 		moduleId: { value: '19296' },
 		event,
 		...(event === 'activityPerformed' ? { activityId: { value: 'activity-1' } } : {}),
+		...(event === 'stateChanged' ? { stateChangeDirection, stateId: { value: 'state-1' } } : {}),
 	};
 
 	return {
@@ -91,6 +97,24 @@ test('registers entry events without reading the hidden Activity property', asyn
 		assert.equal(await node.webhookMethods.default.create.call(context), true);
 		assert.equal(requests.length, 1);
 		assert.equal(requests[0].options.body.item, item);
+	}
+});
+
+test('registers State Changed webhooks for both supported directions', async () => {
+	const node = new InistateTrigger();
+	for (const direction of ['changeFrom', 'changeTo']) {
+		const requests = [];
+		const context = createHookContext(requests, {}, 'stateChanged', direction);
+
+		assert.equal(await node.webhookMethods.default.create.call(context), true);
+		assert.deepEqual(requests[0].options.body, {
+			moduleId: '19296',
+			item: 'state-1',
+			type: 'state',
+			trigger: direction,
+			channel: 'n8n',
+			url: 'https://n8n.example/webhook/inistate',
+		});
 	}
 });
 

@@ -10,14 +10,22 @@ export const APP02_BASE_URL = 'https://app02.apps.inistate.com';
 
 export type P0Operation = 'create' | 'update' | 'performActivity' | 'changeState' | 'assign';
 
+export type P1Operation = 'delete' | 'duplicate';
+
+export type InistateOperation = P0Operation | P1Operation;
+
 export type P0TriggerEvent = 'entryCreated' | 'entryUpdated' | 'activityPerformed';
+
+export type P1TriggerEvent = 'stateChanged';
+
+export type InistateTriggerEvent = P0TriggerEvent | P1TriggerEvent;
 
 type UnknownRecord = Record<string, unknown>;
 
 const REFERENCE_VALUE_PREFIX = '__inistate_reference__:';
 
 export interface ActionRequestInput {
-	operation: P0Operation;
+	operation: InistateOperation;
 	moduleId: string;
 	documentId?: string;
 	activityId?: string;
@@ -113,6 +121,14 @@ export function buildActionBody(input: ActionRequestInput): IDataObject {
 		};
 	}
 
+	if (operation === 'delete' || operation === 'duplicate') {
+		return {
+			activityId: operation,
+			moduleId,
+			entry: documentId,
+		};
+	}
+
 	if (operation !== 'assign') {
 		throw new Error(`Unsupported Inistate operation: ${String(operation)}`);
 	}
@@ -151,12 +167,18 @@ export function getTriggerItem(event: P0TriggerEvent, activityId?: string): stri
 	return activityId;
 }
 
-export function buildSubscription(moduleId: string, item: string, webhookUrl: string): IDataObject {
+export function buildSubscription(
+	moduleId: string,
+	item: string,
+	webhookUrl: string,
+	type = 'activity',
+	trigger = 'execute',
+): IDataObject {
 	return {
 		moduleId,
 		item,
-		type: 'activity',
-		trigger: 'execute',
+		type,
+		trigger,
 		channel: 'n8n',
 		url: webhookUrl,
 	};

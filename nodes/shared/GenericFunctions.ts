@@ -58,6 +58,21 @@ async function getWorkspaceDetails(
 	});
 }
 
+async function getModuleStates(
+	context: InistateRequestFunctions,
+	workspaceId: string,
+	moduleId: string,
+): Promise<unknown[]> {
+	const response = await getWorkspaceDetails(context, workspaceId);
+	return extractCollection(response, 'states').filter((state) => {
+		if (typeof state !== 'object' || state === null || Array.isArray(state)) {
+			return false;
+		}
+
+		return String((state as Record<string, unknown>).module) === moduleId;
+	});
+}
+
 async function getModuleForm(
 	context: InistateRequestFunctions,
 	workspaceId: string,
@@ -219,16 +234,18 @@ export const listSearch = {
 	async searchStates(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
 		const workspaceId = getSelectedValue(this, 'workspaceId');
 		const moduleId = getSelectedValue(this, 'moduleId');
-		const response = await getWorkspaceDetails(this, workspaceId);
-		const states = extractCollection(response, 'states').filter((state) => {
-			if (typeof state !== 'object' || state === null || Array.isArray(state)) {
-				return false;
-			}
-
-			return String((state as Record<string, unknown>).module) === moduleId;
-		});
-
+		const states = await getModuleStates(this, workspaceId, moduleId);
 		return { results: toSearchItems(states, ['name'], ['name'], filter) };
+	},
+
+	async searchStateIds(
+		this: ILoadOptionsFunctions,
+		filter?: string,
+	): Promise<INodeListSearchResult> {
+		const workspaceId = getSelectedValue(this, 'workspaceId');
+		const moduleId = getSelectedValue(this, 'moduleId');
+		const states = await getModuleStates(this, workspaceId, moduleId);
+		return { results: toSearchItems(states, ['id'], ['name'], filter) };
 	},
 
 	async searchUsers(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {

@@ -35,14 +35,17 @@ Status meanings:
 Run evidence:
 
 ```text
-npm test
-28 tests, 28 passed, 0 failed
+node --test --test-force-exit test/**/*.test.cjs (against the active dev watch build)
+31 tests, 31 passed, 0 failed
+
+npx tsc --noEmit
+exit code 0
 
 npm run lint
 exit code 0 with @n8n/node-cli 0.44.4
 
 npm pack --dry-run --json
-exit code 0; 75 files; both nodes, credentials, metadata, icons, action/event modules, and shared
+exit code 0; 84 files; both nodes, credentials, metadata, icons, action/event modules, and shared
 runtime included
 ```
 
@@ -78,7 +81,7 @@ sandbox.
 | No runtime dependency/filesystem/environment access | Confirmed | Package has no runtime dependencies; runtime source uses n8n helpers only   |
 | Production dependency audit                         | Confirmed | `npm audit --omit=dev`: zero vulnerabilities                                |
 | Full development dependency audit                   | Partial   | 13 upstream advisories remain inside latest `@n8n/node-cli` transitive tree |
-| Package content                                     | Confirmed | `npm pack --dry-run --json` contains 75 intended files only                 |
+| Package content                                     | Confirmed | `npm pack --dry-run --json` contains 84 intended files only                 |
 | Separate clean-install smoke                        | Confirmed | Tarball loaded action and trigger v1 in a clean n8n 2.35.5 node catalog     |
 | Secrets excluded from repository                    | Confirmed | No API key is stored in source or tests; credential is password-typed       |
 | Diff inspection                                     | Confirmed | `git diff` and `git diff --check` available before acceptance               |

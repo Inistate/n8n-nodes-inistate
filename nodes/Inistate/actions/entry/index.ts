@@ -4,11 +4,13 @@ import { inistateApiRequest } from '../../../shared/GenericFunctions';
 import {
 	buildActionBody,
 	buildApiHeaders,
-	type P0Operation,
+	type InistateOperation,
 } from '../../../shared/Inistate.contract';
 import { assignEntryAction } from './assign.operation';
 import { changeStateAction } from './changeState.operation';
 import { createEntryAction } from './create.operation';
+import { deleteEntryAction } from './delete.operation';
+import { duplicateEntryAction } from './duplicate.operation';
 import { performActivityAction } from './performActivity.operation';
 import { updateEntryAction } from './update.operation';
 
@@ -16,6 +18,8 @@ export const entryActions = [
 	assignEntryAction,
 	changeStateAction,
 	createEntryAction,
+	deleteEntryAction,
+	duplicateEntryAction,
 	performActivityAction,
 	updateEntryAction,
 ];
@@ -27,7 +31,7 @@ const actionsByOperation = new Map(entryActions.map((action) => [action.operatio
 
 export async function executeEntryAction(
 	context: IExecuteFunctions,
-	operation: P0Operation,
+	operation: InistateOperation,
 	itemIndex: number,
 	workspaceId: string,
 	moduleId: string,

@@ -1,6 +1,6 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-import type { P0Operation } from '../../../shared/Inistate.contract';
+import type { InistateOperation, P0Operation } from '../../../shared/Inistate.contract';
 
 export const listMode = (searchListMethod: string) => ({
 	displayName: 'From List',
@@ -40,7 +40,9 @@ export const moduleProperty: INodeProperties = {
 	modes: [listMode('searchModules'), idMode('module', '19296')],
 };
 
-export function documentIdProperty(operation: Exclude<P0Operation, 'create'>): INodeProperties {
+export function documentIdProperty(
+	operation: Exclude<InistateOperation, 'create'>,
+): INodeProperties {
 	return {
 		displayName: 'Document ID',
 		name: 'documentId',
@@ -72,7 +74,12 @@ export function fieldsProperty(
 		noDataExpression: true,
 		displayOptions: { show: { operation: [operation] } },
 		typeOptions: {
-			loadOptionsDependsOn: ['operation', 'moduleId.value', 'activityId.value'],
+			loadOptionsDependsOn: [
+				'operation',
+				'workspaceId.value',
+				'moduleId.value',
+				'activityId.value',
+			],
 			resourceMapper: {
 				resourceMapperMethod: 'getFormFields',
 				mode: 'add',

@@ -1,6 +1,6 @@
 import type { IExecuteFunctions, INodeProperties, INodePropertyOptions } from 'n8n-workflow';
 
-import type { ActionRequestInput, P0Operation } from '../../../shared/Inistate.contract';
+import type { ActionRequestInput, InistateOperation } from '../../../shared/Inistate.contract';
 
 export interface EntryActionContext {
 	itemIndex: number;
@@ -9,7 +9,7 @@ export interface EntryActionContext {
 }
 
 export interface EntryActionDefinition {
-	operation: P0Operation;
+	operation: InistateOperation;
 	option: INodePropertyOptions;
 	properties: INodeProperties[];
 	prepareInput(this: IExecuteFunctions, context: EntryActionContext): Promise<ActionRequestInput>;
