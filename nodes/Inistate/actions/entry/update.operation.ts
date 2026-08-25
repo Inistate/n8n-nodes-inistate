@@ -23,7 +23,10 @@ export const updateEntryAction: EntryActionDefinition = {
 			throw new NodeOperationError(
 				this.getNode(),
 				new Error('Select at least one field to update'),
-				{ itemIndex },
+				{
+					itemIndex,
+					description: 'Choose one or more Fields values before running the Update operation.',
+				},
 			);
 		}
 

@@ -17,7 +17,7 @@ const stateProperty: INodeProperties = {
 			displayName: 'By Name',
 			name: 'name',
 			type: 'string',
-			placeholder: 'Completed',
+			placeholder: 'e.g. Completed',
 			hint: 'Enter the exact Inistate state name',
 		},
 	],

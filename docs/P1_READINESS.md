@@ -1,6 +1,6 @@
 # P1 readiness record
 
-Last updated: 2026-08-24 (Asia/Singapore)
+Last updated: 2026-08-25 (Asia/Singapore)
 
 Decision: **NOT READY**. Delete Entry and Duplicate Entry are implemented and requester-confirmed in
 basic live App02 testing. State Changed is implemented and its automated selector and
@@ -11,11 +11,11 @@ webhook-registration contracts pass, but its live delivery and removal matrix re
 The implementations follow the existing `zapierIntegration` behavior while using n8n-native node
 properties and lifecycle methods:
 
-| P1 feature    | Existing Inistate contract                                                                                       | Added n8n safeguard or validation                                    |
-| ------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Delete Entry  | `POST /api/activity/` with `activityId: delete`, `moduleId`, and entry document ID                               | Irreversible-action notice; non-2xx responses are rejected           |
-| Duplicate     | `POST /api/activity/` with `activityId: duplicate`, `moduleId`, and entry document ID                            | Non-2xx responses are rejected; the App02 response is passed through |
-| State Changed | `POST /api/automationHook` with `type: state`, selected state ID, `changeFrom` or `changeTo`, and `channel: n8n` | Separate State ID selector and shared registration/removal lifecycle |
+| P1 feature    | Existing Inistate contract                                                                                       | Added n8n safeguard or validation                                          |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Delete Entry  | `POST /api/activity/` with `activityId: delete`, `moduleId`, and entry document ID                               | Irreversible warning; non-2xx rejection; stable `{ deleted: true }` output |
+| Duplicate     | `POST /api/activity/` with `activityId: duplicate`, `moduleId`, and entry document ID                            | Non-2xx responses are rejected; the App02 response is passed through       |
+| State Changed | `POST /api/automationHook` with `type: state`, selected state ID, `changeFrom` or `changeTo`, and `channel: n8n` | Separate State ID selector and shared registration/removal lifecycle       |
 
 ## Automated evidence
 
@@ -28,7 +28,16 @@ properties and lifecycle methods:
 | Duplicate accepts the existing API response contract    | Confirmed | Runtime test accepts a successful response without a document ID  |
 | State selector sends an ID rather than a display name   | Confirmed | Dedicated `searchStateIds` selector test                          |
 | State Changed registers the correct state hook          | Confirmed | Exact `type`, `item`, `trigger`, `channel`, and callback URL test |
+| State Changed removes both direction-specific hooks     | Confirmed | Full create/check/delete lifecycle test for both directions       |
+| Failed State Changed removal preserves its hook ID      | Confirmed | API-failure lifecycle regression test                             |
+| P1 API failures use `NodeApiError` with recovery text   | Confirmed | Error class, status, and recovery-description test                |
+| Mutation output/AI UX decision is explicit              | Confirmed | Stable Delete output and structure/documentation tests            |
 | Existing P0 contracts remain intact                     | Confirmed | Full automated suite passes                                       |
+
+The v1 action node intentionally has no Simplify Output toggle. Each operation is a bounded
+single-entry mutation rather than a list/read operation. Delete has a stable minimal output, while
+the remaining operations preserve the service response. `usableAsTool` remains enabled; the Delete
+description states that it cannot be undone and AI workflows should add human approval.
 
 ## Mandatory live App02 matrix
 

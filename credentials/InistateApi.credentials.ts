@@ -7,13 +7,17 @@ import type {
 
 const APP02_ENVIRONMENT = 'app02';
 const INISTATE_EMAIL_SUFFIX = '@inistate.com';
+const GNEYSOFTWARE_EMAIL_SUFFIX = '@gneysoftware.com';
 
 export class InistateApi implements ICredentialType {
 	name = 'inistateApi';
 
 	displayName = 'Inistate API';
 
-	icon = { light: 'file:inistate.svg', dark: 'file:inistate.dark.svg' } as const;
+	icon = {
+		light: 'file:inistate.svg',
+		dark: 'file:inistate.dark.svg',
+	} as const;
 
 	documentationUrl = 'https://github.com/Inistate/n8n-nodes-inistate#credentials';
 
@@ -24,7 +28,7 @@ export class InistateApi implements ICredentialType {
 			type: 'string',
 			default: '',
 			required: true,
-			placeholder: 'name@example.com',
+			placeholder: 'e.g. name@example.com',
 			description: 'Username returned by the Inistate profile, normally your email address',
 		},
 		{
@@ -46,11 +50,14 @@ export class InistateApi implements ICredentialType {
 			default: 'production',
 			displayOptions: {
 				show: {
-					username: [{ _cnd: { endsWith: INISTATE_EMAIL_SUFFIX } }],
+					username: [
+						{ _cnd: { endsWith: INISTATE_EMAIL_SUFFIX } },
+						{ _cnd: { endsWith: GNEYSOFTWARE_EMAIL_SUFFIX } },
+					],
 				},
 			},
 			description:
-				'API environment. App02 is available only when the username ends with @inistate.com.',
+				'API environment. App02 is available only when the username ends with @inistate.com or @gneysoftware.com.',
 		},
 		{
 			displayName: 'API Key',
@@ -69,8 +76,14 @@ export class InistateApi implements ICredentialType {
 			.trim()
 			.toLowerCase();
 
-		if (environment === APP02_ENVIRONMENT && !username.endsWith(INISTATE_EMAIL_SUFFIX)) {
-			throw new Error('App02 can only be selected for an @inistate.com username');
+		if (
+			environment === APP02_ENVIRONMENT &&
+			!username.endsWith(INISTATE_EMAIL_SUFFIX) &&
+			!username.endsWith(GNEYSOFTWARE_EMAIL_SUFFIX)
+		) {
+			throw new Error(
+				'App02 can only be selected for an @inistate.com or @gneysoftware.com username.',
+			);
 		}
 
 		return {

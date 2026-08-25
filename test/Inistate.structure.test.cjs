@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const { Inistate } = require('../dist/nodes/Inistate/Inistate.node.js');
+const { InistateApi } = require('../dist/credentials/InistateApi.credentials.js');
 const { assignEntryAction } = require('../dist/nodes/Inistate/actions/entry/assign.operation.js');
 const {
 	changeStateAction,
@@ -97,4 +98,42 @@ test('advertises exactly the four event modules registered by the trigger node',
 			.map(({ name }) => name),
 		['stateChangeDirection', 'stateId'],
 	);
+});
+
+test('keeps bounded mutation output tool-friendly without a Simplify toggle', () => {
+	const node = new Inistate();
+	assert.equal(node.description.usableAsTool, true);
+	assert.equal(
+		node.description.properties.some(({ name }) => name === 'simplifyOutput'),
+		false,
+	);
+	assert.match(deleteEntryAction.option.description, /cannot be undone/i);
+});
+
+test('prefixes example placeholders with e.g.', () => {
+	const definitions = [
+		new Inistate().description,
+		new InistateTrigger().description,
+		{ properties: new InistateApi().properties },
+	];
+	const placeholders = [];
+
+	function collect(value) {
+		if (Array.isArray(value)) {
+			for (const item of value) collect(item);
+			return;
+		}
+		if (!value || typeof value !== 'object') return;
+		for (const [key, child] of Object.entries(value)) {
+			if (key === 'placeholder' && typeof child === 'string' && child.length > 0) {
+				placeholders.push(child);
+			} else {
+				collect(child);
+			}
+		}
+	}
+
+	for (const definition of definitions) collect(definition.properties);
+	assert.ok(placeholders.length > 0);
+	for (const placeholder of placeholders) assert.match(placeholder, /^e\.g\. /);
 });

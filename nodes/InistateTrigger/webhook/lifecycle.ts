@@ -20,7 +20,10 @@ export const webhookMethods = {
 		async create(this: IHookFunctions): Promise<boolean> {
 			const webhookUrl = this.getNodeWebhookUrl('default');
 			if (!webhookUrl) {
-				throw new NodeOperationError(this.getNode(), 'n8n did not provide a webhook URL');
+				throw new NodeOperationError(this.getNode(), 'n8n did not provide a webhook URL', {
+					description:
+						'Save the workflow and check the n8n webhook URL configuration before activating it again.',
+				});
 			}
 
 			const workspaceId = String(
@@ -28,7 +31,19 @@ export const webhookMethods = {
 			);
 			const moduleId = String(this.getNodeParameter('moduleId', undefined, { extractValue: true }));
 			const event = this.getNodeParameter('event') as InistateTriggerEvent;
-			const subscription = getTriggerSubscriptionForEvent(this, event);
+			let subscription;
+			try {
+				subscription = getTriggerSubscriptionForEvent(this, event);
+			} catch (error) {
+				throw new NodeOperationError(
+					this.getNode(),
+					error instanceof Error ? error : new Error('Invalid Inistate trigger configuration'),
+					{
+						description:
+							'Check the selected trigger event and its required Activity or State values, then activate the workflow again.',
+					},
+				);
+			}
 			const requestOptions: IHttpRequestOptions = {
 				method: 'POST',
 				url: '/api/automationHook',
@@ -48,7 +63,10 @@ export const webhookMethods = {
 			try {
 				this.getWorkflowStaticData('node').webhookId = getWebhookId(response);
 			} catch (error) {
-				throw new NodeOperationError(this.getNode(), (error as Error).message);
+				throw new NodeOperationError(this.getNode(), (error as Error).message, {
+					description:
+						'Retry workflow activation. If the problem continues, verify that Inistate returns a webhook registration ID.',
+				});
 			}
 
 			return true;

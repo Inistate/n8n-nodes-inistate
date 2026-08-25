@@ -17,7 +17,7 @@ const userProperty: INodeProperties = {
 			displayName: 'By Username',
 			name: 'username',
 			type: 'string',
-			placeholder: 'user@example.com',
+			placeholder: 'e.g. user@example.com',
 			hint: 'Enter the exact Inistate username',
 		},
 	],

@@ -7,8 +7,10 @@ import type {
 	ILoadOptionsFunctions,
 	INodeListSearchResult,
 	INodePropertyOptions,
+	JsonObject,
 	ResourceMapperFields,
 } from 'n8n-workflow';
+import { NodeApiError } from 'n8n-workflow';
 
 import {
 	buildApiHeaders,
@@ -31,19 +33,28 @@ export async function inistateApiRequest(
 	const credentials = await context.getCredentials('inistateApi');
 	const baseUrl = getInistateBaseUrl(credentials.environment);
 
-	return await context.helpers.httpRequestWithAuthentication.call(
-		context as IAllExecuteFunctions,
-		'inistateApi',
-		{
-			...options,
-			url: options.url.startsWith('http') ? options.url : `${baseUrl}${options.url}`,
-			json: true,
-		},
-	);
+	try {
+		return await context.helpers.httpRequestWithAuthentication.call(
+			context as IAllExecuteFunctions,
+			'inistateApi',
+			{
+				...options,
+				url: options.url.startsWith('http') ? options.url : `${baseUrl}${options.url}`,
+				json: true,
+			},
+		);
+	} catch (error) {
+		throw new NodeApiError(context.getNode(), error as JsonObject, {
+			description:
+				'Check the Inistate credential, selected environment, workspace and module access, and request values, then try again.',
+		});
+	}
 }
 
 function getSelectedValue(context: ILoadOptionsFunctions, parameterName: string): string {
-	const value = context.getNodeParameter(parameterName, undefined, { extractValue: true });
+	const value = context.getNodeParameter(parameterName, undefined, {
+		extractValue: true,
+	});
 	return value === undefined || value === null ? '' : String(value);
 }
 
@@ -330,7 +341,9 @@ export const resourceMapping = {
 		return {
 			fields,
 			...(fields.length === 0
-				? { emptyFieldsNotice: 'This Inistate activity has no configurable form fields.' }
+				? {
+						emptyFieldsNotice: 'This Inistate activity has no configurable form fields.',
+					}
 				: {}),
 		};
 	},

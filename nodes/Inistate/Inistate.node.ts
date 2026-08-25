@@ -1,11 +1,12 @@
 import type {
 	IDataObject,
 	IExecuteFunctions,
+	JsonObject,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
-import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import {
 	entryOperationOptions,
@@ -69,10 +70,14 @@ export class Inistate implements INodeType {
 			try {
 				const operation = this.getNodeParameter('operation', itemIndex) as InistateOperation;
 				const workspaceId = String(
-					this.getNodeParameter('workspaceId', itemIndex, '', { extractValue: true }),
+					this.getNodeParameter('workspaceId', itemIndex, '', {
+						extractValue: true,
+					}),
 				);
 				const moduleId = String(
-					this.getNodeParameter('moduleId', itemIndex, '', { extractValue: true }),
+					this.getNodeParameter('moduleId', itemIndex, '', {
+						extractValue: true,
+					}),
 				);
 				const response = await executeEntryAction(
 					this,
@@ -82,21 +87,36 @@ export class Inistate implements INodeType {
 					moduleId,
 				);
 				returnData.push({
-					json: normalizeResponse(response),
+					json: normalizeResponse(operation, response),
 					pairedItem: { item: itemIndex },
 				});
 			} catch (error) {
 				if (this.continueOnFail()) {
 					returnData.push({
-						json: { error: error instanceof Error ? error.message : 'Unknown Inistate error' },
+						json: {
+							error: error instanceof Error ? error.message : 'Unknown Inistate error',
+						},
 						pairedItem: { item: itemIndex },
 					});
 					continue;
 				}
+				if (error instanceof NodeApiError) {
+					throw new NodeApiError(this.getNode(), error as unknown as JsonObject);
+				}
+				if (error instanceof NodeOperationError) {
+					throw new NodeOperationError(this.getNode(), error, {
+						itemIndex,
+						description: error.description ?? undefined,
+					});
+				}
 				throw new NodeOperationError(
 					this.getNode(),
 					error instanceof Error ? error : new Error('Unknown Inistate error'),
-					{ itemIndex },
+					{
+						itemIndex,
+						description:
+							'Check the selected operation, required fields, and Inistate identifiers, then try again.',
+					},
 				);
 			}
 		}
@@ -105,7 +125,11 @@ export class Inistate implements INodeType {
 	}
 }
 
-function normalizeResponse(response: unknown): IDataObject {
+function normalizeResponse(operation: InistateOperation, response: unknown): IDataObject {
+	if (operation === 'delete') {
+		return { deleted: true };
+	}
+
 	if (typeof response === 'object' && response !== null && !Array.isArray(response)) {
 		return response as IDataObject;
 	}

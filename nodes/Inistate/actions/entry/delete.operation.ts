@@ -17,7 +17,7 @@ export const deleteEntryAction: EntryActionDefinition = {
 		name: 'Delete',
 		value: 'delete',
 		action: 'Delete an entry',
-		description: 'Permanently delete an entry',
+		description: 'Permanently delete an entry; this cannot be undone',
 	},
 	properties: [deleteWarningProperty, documentIdProperty('delete')],
 	async prepareInput({ itemIndex, moduleId }) {

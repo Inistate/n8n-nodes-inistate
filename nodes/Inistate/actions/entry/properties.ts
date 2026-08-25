@@ -16,7 +16,7 @@ export const idMode = (displayName: string, placeholder: string) => ({
 	displayName: 'By ID',
 	name: 'id',
 	type: 'string' as const,
-	placeholder,
+	placeholder: `e.g. ${placeholder}`,
 	hint: `Enter the ${displayName} ID when it is not available in the list`,
 });
 
@@ -49,7 +49,7 @@ export function documentIdProperty(
 		type: 'string',
 		default: '',
 		required: true,
-		placeholder: 'N8N-TEST00001',
+		placeholder: 'e.g. N8N-TEST00001',
 		description: 'The stable document ID of the entry',
 		displayOptions: { show: { operation: [operation] } },
 	};

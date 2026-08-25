@@ -145,7 +145,7 @@ Validated development toolchain:
 
 - Node.js `22.22.0`
 - npm `10.9.4`
-- `@n8n/node-cli` `0.44.4`
+- `@n8n/node-cli` `0.44.5`
 - local n8n `2.35.5`
 
 Install and verify:
@@ -194,6 +194,10 @@ n8n if requested. Community-node installation availability depends on the n8n de
 - The protected P0 baseline remains the five P0 actions and three P0 triggers above. Delete,
   Duplicate, and State Changed are implemented P1 release candidates, but are not live-approved.
   Comment, Information Due, and Field Changed remain deferred P2 scope.
+- The action node remains available as an AI tool. Its operations return one bounded mutation
+  response, so v1 does not add a Simplify Output toggle. Delete always returns `{ "deleted": true }`;
+  other operations preserve the Inistate response. Delete is irreversible, so AI workflows should
+  require human approval before allowing an agent to run it.
 - The package is not production-ready until the live sandbox matrix, public webhook delivery,
   trusted npm publishing, and Creator Portal prerequisites are completed.
 

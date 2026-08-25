@@ -36,13 +36,13 @@ Run evidence:
 
 ```text
 node --test --test-force-exit test/**/*.test.cjs
-33 tests, 33 passed, 0 failed
+40 tests, 40 passed, 0 failed
 
 npx tsc --noEmit
 exit code 0
 
 npm run lint
-exit code 0 with @n8n/node-cli 0.44.4
+exit code 0 with @n8n/node-cli 0.44.5
 
 npm pack --dry-run --json
 exit code 0; 84 files; both nodes, credentials, metadata, icons, action/event modules, and shared
@@ -76,7 +76,7 @@ sandbox.
 | Requirement                                         | Status    | Evidence or blocker                                                         |
 | --------------------------------------------------- | --------- | --------------------------------------------------------------------------- |
 | Node.js/npm recorded                                | Confirmed | Node `22.22.0`, npm `10.9.4`                                                |
-| Official n8n CLI build/test/lint                    | Confirmed | `@n8n/node-cli` `0.44.4`, all exit 0                                        |
+| Official n8n CLI build/test/lint                    | Confirmed | `@n8n/node-cli` `0.44.5`, all exit 0                                        |
 | Local development n8n starts                        | Confirmed | n8n `2.35.5` served at `http://localhost:5678`                              |
 | No runtime dependency/filesystem/environment access | Confirmed | Package has no runtime dependencies; runtime source uses n8n helpers only   |
 | Production dependency audit                         | Confirmed | `npm audit --omit=dev`: zero vulnerabilities                                |

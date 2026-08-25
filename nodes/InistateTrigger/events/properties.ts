@@ -11,7 +11,7 @@ export const idMode = (displayName: string, placeholder: string) => ({
 	displayName: 'By ID',
 	name: 'id',
 	type: 'string' as const,
-	placeholder,
+	placeholder: `e.g. ${placeholder}`,
 	hint: `Enter the ${displayName} ID when it is not available in the list`,
 });
 
