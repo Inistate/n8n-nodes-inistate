@@ -9,6 +9,7 @@ import type {
 	INodePropertyOptions,
 	JsonObject,
 	ResourceMapperFields,
+	ResourceMapperValue,
 } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
 
@@ -18,6 +19,7 @@ import {
 	extractFormElements,
 	getInistateBaseUrl,
 	getFormDefaultValues,
+	getMappedFieldValues,
 	mapFormFields,
 	toReferenceFieldOptions,
 	toFieldSearchItems,
@@ -108,6 +110,190 @@ async function getModuleForm(
 			...(entryId !== undefined ? { entryId } : {}),
 		},
 	});
+}
+
+export async function resolveMappedFieldValues(
+	context: InistateRequestFunctions,
+	workspaceId: string,
+	moduleId: string,
+	activityId: string,
+	fields: ResourceMapperValue | IDataObject | null | undefined,
+): Promise<IDataObject> {
+	const mappedValues = getMappedFieldValues(fields);
+	if (!fields || typeof fields !== 'object' || !('value' in fields) || !Array.isArray(fields.schema)) {
+		return mappedValues;
+	}
+
+	const rawValues =
+		fields.value && typeof fields.value === 'object' ? (fields.value as IDataObject) : {};
+	const optionFieldNames = new Set(
+		fields.schema
+			.filter(
+				(field) =>
+					field.type === 'options' && Object.prototype.hasOwnProperty.call(rawValues, field.id),
+			)
+			.map((field) => field.id),
+	);
+	if (optionFieldNames.size === 0) {
+		return mappedValues;
+	}
+
+	const form = await getModuleForm(context, workspaceId, moduleId, activityId);
+	const referenceElements = extractFormElements(form).filter(
+		(element) =>
+			[7, 20].includes(Number(element.type)) &&
+			typeof element.fieldName === 'string' &&
+			optionFieldNames.has(element.fieldName) &&
+			(typeof element.id === 'string' || typeof element.id === 'number'),
+	);
+
+	for (const element of referenceElements) {
+		const fieldName = String(element.fieldName);
+		const fieldType = Number(element.type);
+		const rawValue = rawValues[fieldName];
+		const suppliedId = mappedValues[`${fieldName}Id`];
+		const searchText = getReferenceSearchText(rawValue, mappedValues[fieldName]);
+		const filteredResponse = await getReferenceSelection(
+			context,
+			workspaceId,
+			moduleId,
+			activityId,
+			element.id as string | number,
+			searchText,
+			0,
+		);
+		let reference = findCurrentReference(
+			fieldName,
+			fieldType,
+			filteredResponse,
+			rawValue,
+			suppliedId,
+		);
+
+		if (!reference && suppliedId !== undefined) {
+			for (let currentPage = 0; currentPage < 10 && !reference; currentPage++) {
+				const pageResponse = await getReferenceSelection(
+					context,
+					workspaceId,
+					moduleId,
+					activityId,
+					element.id as string | number,
+					'',
+					currentPage,
+				);
+				const pageOptions = toReferenceFieldOptions(fieldType, pageResponse);
+				if (pageOptions.length === 0) {
+					break;
+				}
+				reference = findCurrentReference(
+					fieldName,
+					fieldType,
+					pageResponse,
+					rawValue,
+					suppliedId,
+				);
+			}
+		}
+
+		if (reference) {
+			mappedValues[fieldName] = reference.name;
+			mappedValues[`${fieldName}Id`] = reference.id;
+			if (reference.username !== undefined) {
+				mappedValues[`${fieldName}Username`] = reference.username;
+			}
+		}
+	}
+
+	return mappedValues;
+}
+
+async function getReferenceSelection(
+	context: InistateRequestFunctions,
+	workspaceId: string,
+	moduleId: string,
+	activityId: string,
+	fieldId: string | number,
+	text: string,
+	currentPage: number,
+): Promise<unknown> {
+	return await inistateApiRequest(context, {
+		method: 'POST',
+		url: '/api/activity/formselection',
+		headers: buildApiHeaders(workspaceId, false),
+		body: {
+			activityId,
+			text,
+			currentPage,
+			vectorId: /^\d+$/.test(moduleId) ? Number(moduleId) : moduleId,
+			fieldId,
+			reference: null,
+			documentId: '',
+		},
+	});
+}
+
+function findCurrentReference(
+	fieldName: string,
+	fieldType: number,
+	response: unknown,
+	rawValue: unknown,
+	suppliedId: unknown,
+): { id: string | number; name: string; username?: string } | undefined {
+	const comparableValues = getReferenceComparableValues(rawValue);
+	const references = toReferenceFieldOptions(fieldType, response).flatMap((option) => {
+		const decoded = getMappedFieldValues({ [fieldName]: option.value });
+		const id = decoded[`${fieldName}Id`];
+		const name = decoded[fieldName];
+		const username = decoded[`${fieldName}Username`];
+		return (typeof id === 'string' || typeof id === 'number') && typeof name === 'string'
+			? [
+					{
+						id,
+						name,
+						...(typeof username === 'string' ? { username } : {}),
+					},
+				]
+			: [];
+	});
+	const matches = references.filter((reference) =>
+		suppliedId !== undefined
+			? String(reference.id) === String(suppliedId)
+			: comparableValues.has(reference.name) ||
+				(reference.username !== undefined && comparableValues.has(reference.username)),
+	);
+
+	return matches.length === 1 ? matches[0] : undefined;
+}
+
+function getReferenceSearchText(rawValue: unknown, mappedValue: unknown): string {
+	if (typeof rawValue === 'object' && rawValue !== null && !Array.isArray(rawValue)) {
+		const value = rawValue as Record<string, unknown>;
+		for (const key of ['name', 'Text', 'username', 'Username']) {
+			if (typeof value[key] === 'string') {
+				return value[key];
+			}
+		}
+	}
+
+	if (typeof rawValue === 'string' && !rawValue.startsWith('__inistate_reference__:')) {
+		return rawValue;
+	}
+	return typeof mappedValue === 'string' ? mappedValue : String(rawValue ?? '');
+}
+
+function getReferenceComparableValues(rawValue: unknown): Set<string> {
+	if (typeof rawValue === 'object' && rawValue !== null && !Array.isArray(rawValue)) {
+		const value = rawValue as Record<string, unknown>;
+		return new Set(
+			['name', 'Text', 'username', 'Username']
+				.map((key) => value[key])
+				.filter((candidate): candidate is string => typeof candidate === 'string'),
+		);
+	}
+
+	return new Set(
+		typeof rawValue === 'string' || typeof rawValue === 'number' ? [String(rawValue)] : [],
+	);
 }
 
 export async function getCurrentEntryFields(

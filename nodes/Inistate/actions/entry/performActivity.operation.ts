@@ -1,5 +1,6 @@
 import type { INodeProperties, ResourceMapperValue } from 'n8n-workflow';
 
+import { resolveMappedFieldValues } from '../../../shared/GenericFunctions';
 import { documentIdProperty, fieldsProperty, idMode, listMode } from './properties';
 import type { EntryActionDefinition } from './types';
 
@@ -27,15 +28,23 @@ export const performActivityAction: EntryActionDefinition = {
 		activityProperty,
 		fieldsProperty('performActivity'),
 	],
-	async prepareInput({ itemIndex, moduleId }) {
+	async prepareInput({ itemIndex, moduleId, workspaceId }) {
+		const activityId = String(
+			this.getNodeParameter('activityId', itemIndex, '', { extractValue: true }),
+		);
+		const fields = this.getNodeParameter('fields', itemIndex) as ResourceMapperValue;
 		return {
 			operation: 'performActivity',
 			moduleId,
 			documentId: String(this.getNodeParameter('documentId', itemIndex)),
-			activityId: String(
-				this.getNodeParameter('activityId', itemIndex, '', { extractValue: true }),
+			activityId,
+			fields: await resolveMappedFieldValues(
+				this,
+				workspaceId,
+				moduleId,
+				activityId,
+				fields,
 			),
-			fields: this.getNodeParameter('fields', itemIndex) as ResourceMapperValue,
 		};
 	},
 };

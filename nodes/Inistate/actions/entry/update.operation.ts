@@ -1,8 +1,10 @@
 import type { ResourceMapperValue } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 
-import { getCurrentEntryFields } from '../../../shared/GenericFunctions';
-import { getMappedFieldValues } from '../../../shared/Inistate.contract';
+import {
+	getCurrentEntryFields,
+	resolveMappedFieldValues,
+} from '../../../shared/GenericFunctions';
 import { documentIdProperty, fieldsProperty } from './properties';
 import type { EntryActionDefinition } from './types';
 
@@ -18,7 +20,13 @@ export const updateEntryAction: EntryActionDefinition = {
 	async prepareInput({ itemIndex, moduleId, workspaceId }) {
 		const documentId = String(this.getNodeParameter('documentId', itemIndex));
 		const fields = this.getNodeParameter('fields', itemIndex) as ResourceMapperValue;
-		const selectedFields = getMappedFieldValues(fields);
+		const selectedFields = await resolveMappedFieldValues(
+			this,
+			workspaceId,
+			moduleId,
+			'edit',
+			fields,
+		);
 		if (Object.keys(selectedFields).length === 0) {
 			throw new NodeOperationError(
 				this.getNode(),
