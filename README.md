@@ -6,9 +6,9 @@ Community nodes for using Inistate entries and business events in n8n workflows.
 > published. Credentials default to `https://api.inistate.com`; Inistate staff can select the
 > `https://app02.apps.inistate.com` test environment.
 >
-> **P1 status:** Delete, Duplicate, and State Changed are implemented as release candidates. Their
-> automated contracts pass, but they are not approved until the destructive action and complete
-> webhook lifecycle are verified in App02.
+> **P1 status:** Delete and Duplicate passed live in all three Production sandbox modules. State
+> Changed hook registration/removal passed for both directions, but matching and non-matching
+> webhook delivery still requires verification before approval.
 
 ## Nodes
 
@@ -30,6 +30,21 @@ Create, Update, and Perform Activity load the selected Inistate form at design t
 field types are text, long text, yes/no, integer and decimal numbers, date, date-time, selection,
 module reference, and user/profile reference. Nested sections and tabs are traversed recursively.
 Read-only and unsupported fields are not sent to the activity endpoint.
+
+Reference fields retain their dropdown for fixed values. Values mapped from an earlier node may be
+a unique dropdown name such as `PJ001`, an Inistate internal ID, or an Inistate reference object in
+the `{ Text, Id }` webhook shape. The node resolves these against the field's loaded reference
+options.
+
+When the ID and display value are in separate trigger properties, an expression may combine them
+into an explicit `{ id, name }` object:
+
+```js
+={{ ({ id: $json.header.id, name: $json.data['Project Code'] }) }}
+```
+
+User/profile references may also include `username`. A plain displayed value is accepted only when
+it uniquely matches a loaded option, preventing duplicate names from selecting the wrong entry.
 
 Every input item is processed independently and output items retain their n8n item pairing. Enable
 **Continue On Fail** in the node settings to return an error item instead of stopping the workflow.
@@ -96,9 +111,10 @@ their distinct existing Inistate API contracts.
 
 Create an **Inistate API** credential and enter your Inistate username (normally your email address)
 and API key. The default environment is **Inistate**, which uses `https://api.inistate.com`. When the
-username ends with `@inistate.com`, the credential form also shows the **App02** test environment at
-`https://app02.apps.inistate.com`. App02 is rejected at request time for other usernames. This is a
-client-side product restriction; the selected API still performs the authoritative API-key check.
+username ends with `@inistate.com` or `@gneysoftware.com`, the credential form also shows the
+**App02** test environment at `https://app02.apps.inistate.com`. App02 is rejected at request time
+for other usernames. This is a client-side product restriction; the selected API still performs the
+authoritative API-key check.
 
 n8n stores the key in its encrypted credential store and sends it as
 `Authorization: fsk <API key>`. The key is never a workflow parameter. The credential test calls
@@ -114,11 +130,14 @@ not commit the key, paste it into source code, or place it in ordinary logs.
 
 ## Sandbox example
 
-The current dedicated sandbox is:
+The current dedicated sandbox is hosted in Inistate Production:
 
-- Workspace: `N8N Node Testing` (`2307`)
-- Module: `P0 Task Tracker` (`19296`)
+- Workspace: `N8N Production Sandbox`
+- Modules: `Task Tracker`, `Projects`, and `Members`
 - Automated record prefix: `N8N-TEST`
+
+The live harness resolves current workspace and module IDs from these exact names. IDs are not
+hard-coded because they can differ from the retired App02 sandbox.
 
 Example Create values:
 
@@ -136,8 +155,8 @@ Example Create values:
 ```
 
 Use the created document ID for Update, Assign, Change State, Perform Activity, Duplicate, and Delete
-tests. Run Delete only against a disposable `N8N-TEST` entry. The module contains `Start Work`
-without a form and `Complete Task` with required form fields.
+tests. Run Delete only against disposable `N8N-TEST` entries. The JSON above is a Task Tracker
+example; the live harness reads each module's current form and supplies its required fields.
 
 ## Local development
 
@@ -167,16 +186,20 @@ Open `http://localhost:5678`, create or open a local n8n owner account, add the 
 and add either node to a workflow. This local n8n instance is the expected development method; no
 desktop n8n application is required.
 
-For the destructive-but-self-cleaning App02 sandbox matrix, supply `INISTATE_API_KEY` through your
-shell or CI secret mechanism, then run:
+For the destructive-but-self-cleaning production sandbox matrix, open the git-ignored
+`.env.live.local` file and set `INISTATE_API_KEY` to a least-privilege key scoped to the sandbox.
+`INISTATE_WEBHOOK_URL` is optional for registration/removal and can be set to a public n8n test
+webhook when collecting delivery evidence. Then run:
 
 ```bash
-npm run test:live:app02
+npm run test:live:production
 ```
 
-The live harness is restricted by default to workspace `2307` and module `19296`, prefixes created
-records with `N8N-TEST`, exercises the five P0 actions plus hook registration/removal, and attempts
-to delete every record and hook it creates. Do not run it against a production workspace.
+The live harness refuses ambiguous names and targets only `N8N Production Sandbox`. It resolves and
+tests `Task Tracker`, `Projects`, and `Members`, prefixes records with `N8N-TEST`, exercises safe
+available actions plus P1 Duplicate/Delete and hook registration/removal, and attempts to delete
+every record and hook it creates. This is still the Production API: confirm the key is restricted to
+the sandbox workspace before running it.
 
 ## Installation after publication
 

@@ -38,8 +38,9 @@ npm audit --omit=dev
 npm pack --dry-run --json
 ```
 
-Then complete the App02 sandbox matrix in `P0_READINESS.md`, install the generated package tarball
-into a separate clean n8n instance, and repeat one action plus one webhook smoke test.
+Then complete the Production sandbox matrix in `P0_READINESS.md` for `Task Tracker`, `Projects`, and
+`Members`, install the generated package tarball into a separate clean n8n instance, and repeat one
+action plus one webhook smoke test.
 
 The development-only audit currently contains upstream advisories inherited through the latest
 `@n8n/node-cli`; production dependencies audit clean. Recheck those advisories on every release and

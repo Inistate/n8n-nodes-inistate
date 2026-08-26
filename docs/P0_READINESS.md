@@ -1,10 +1,10 @@
 # P0 readiness record
 
-Last updated: 2026-08-24 (Asia/Singapore)
+Last updated: 2026-08-25 (Asia/Singapore)
 
-Decision: **NOT READY**. The protected P0 implementation exists, automated checks pass, and the
-requester reports that all five exposed action operations and all three triggers passed basic live
-App02 testing through a public tunnel. The full live field matrix and mandatory publishing controls
+Decision: **NOT READY**. The protected P0 implementation exists, automated checks pass, and live
+Production action plus hook registration/removal testing passed in `N8N Production Sandbox` for
+`Task Tracker`, `Projects`, and `Members`. Public webhook delivery and mandatory publishing controls
 remain incomplete.
 
 Status meanings:
@@ -18,25 +18,25 @@ Status meanings:
 
 | Requirement                                               | Status                | Evidence                                                                                            |
 | --------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------- |
-| Create Entry                                              | Confirmed             | Exact automated contract plus requester-confirmed basic live execution                              |
-| Update Entry                                              | Confirmed             | Exact automated contract plus requester-confirmed basic live execution                              |
-| Perform Activity, with and without a form                 | Confirmed             | Automated form/no-form contracts plus requester-confirmed basic live execution                      |
-| Change State                                              | Confirmed             | Exact automated contract plus requester-confirmed basic live execution                              |
-| Assign                                                    | Confirmed             | Exact automated contract plus requester-confirmed basic live execution                              |
-| Entry Created                                             | Confirmed             | Automated `item: create` contract plus requester-confirmed live delivery                            |
-| Entry Updated                                             | Confirmed             | Automated `item: edit` contract plus requester-confirmed live delivery                              |
-| Activity Performed with filtering                         | Confirmed             | Automated selected-activity contract plus requester-confirmed live delivery                         |
+| Create Entry                                              | Confirmed             | Automated contract and live execution passed in all three Production modules                        |
+| Update Entry                                              | Confirmed             | Automated contract and live execution passed in all three Production modules                        |
+| Perform Activity, with and without a form                 | Confirmed             | Automated form/no-form contracts; one available activity passed live in each Production module      |
+| Change State                                              | Confirmed             | Automated contract and live execution passed in all three Production modules                        |
+| Assign                                                    | Confirmed             | Automated contract and live execution passed in all three Production modules                        |
+| Entry Created                                             | Partial               | Contract and hook lifecycle pass; Production webhook delivery remains pending                       |
+| Entry Updated                                             | Partial               | Contract and hook lifecycle pass; Production webhook delivery remains pending                       |
+| Activity Performed with filtering                         | Partial               | Selected-activity contract and hook lifecycle pass; Production delivery remains pending             |
 | Workspace, Module, Activity, Field, State, User selectors | Confirmed (automated) | All six method-level selector tests; dependency scoping covered                                     |
 | API-key credentials                                       | Confirmed             | Password field, generic `fsk` authentication, `/api/profile` test                                   |
-| Dynamic forms                                             | Partial               | Recursive/type/read-only/unsupported automated tests pass; full live form matrix is incomplete      |
+| Dynamic forms                                             | Partial               | Create/edit form discovery and submission pass in all modules; full field-type matrix is incomplete |
 | Multi-item and Continue On Fail behavior                  | Confirmed (automated) | Runtime execution tests preserve paired item indexes and errors                                     |
-| Webhook register/check/delete/delivery lifecycle          | Partial               | Automated lifecycle passes and live delivery is requester-confirmed; live removal is not yet proven |
+| Webhook register/check/delete/delivery lifecycle          | Partial               | Production registration/removal passes for all modules; callback delivery remains pending           |
 
 Run evidence:
 
 ```text
 node --test --test-force-exit test/**/*.test.cjs
-40 tests, 40 passed, 0 failed
+43 tests, 43 passed, 0 failed
 
 npx tsc --noEmit
 exit code 0
@@ -51,25 +51,26 @@ runtime included
 
 ## Sandbox and API
 
-| Requirement                                          | Status                 | Evidence or blocker                                                                                                          |
-| ---------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Production/App02 host selection                     | Partial                | Automated routing passes; App02 is live-tested, but Production has not yet had the same live smoke test                      |
-| `GET /api/profile` with intended key                 | Confirmed by requester | Credential test previously succeeded                                                                                         |
-| Dedicated sandbox                                    | Confirmed              | `N8N Node Testing` workspace `2307`; `P0 Task Tracker` module `19296`                                                        |
-| Representative basic field types                     | Confirmed              | Text, MultiText, Selection, Number, Date, DateTime, YesNo present                                                            |
-| Three states and two transitions                     | Confirmed              | Backlog → In Progress → Completed                                                                                            |
-| Activities with/without forms                        | Confirmed              | Start Work (none), Complete Task (required fields)                                                                           |
-| `medium: n8n` accepted by activity endpoint          | Confirmed by requester | All five exposed action paths passed basic live testing                                                                      |
-| `medium: n8n` / `channel: n8n` registration accepted | Confirmed              | App02 returned registration ID `AwVSpu5SvM`                                                                                  |
-| Public webhook callback delivered                    | Confirmed by requester | All three trigger events delivered through a temporary Cloudflare HTTPS tunnel                                               |
-| Automation hook removed                              | Pending                | Remove current/known registrations and verify cleanup                                                                        |
-| Seeded `N8N-TEST` entry                              | Pending                | Existing entries are not sufficient evidence for the defined automated prefix                                                |
-| Module and user-reference live fields                | Partial                | Module `19305` contains both cases; dropdown and flat payload contracts pass, but live create/update verification is pending |
-| Nested section/tab and unsupported live cases        | Pending                | Covered synthetically only; sandbox cases are absent                                                                         |
-| Two distinct assignable users                        | Pending                | Not yet evidenced                                                                                                            |
+| Requirement                                          | Status    | Evidence or blocker                                                                           |
+| ---------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------- |
+| Production/App02 host selection                      | Confirmed | Automated routing passes; Production profile and live module requests succeeded               |
+| `GET /api/profile` with intended key                 | Confirmed | Production returned success in live run `N8N-TEST-20260825090337`                             |
+| Dedicated sandbox                                    | Confirmed | `N8N Production Sandbox`; modules `Task Tracker`, `Projects`, and `Members`                   |
+| Workspace and module IDs                             | Confirmed | Workspace `12661`; modules `53677`, `53678`, and `53679`, resolved by exact name              |
+| Representative basic field types                     | Partial   | Current create/edit forms submitted successfully; exhaustive type inventory not recorded      |
+| States and transitions                               | Partial   | Change State passed for Backlog, Planning, and Active; webhook delivery remains pending       |
+| Activities with/without forms                        | Confirmed | Start Work, Assign Project Owner, and Terminate passed on disposable records                  |
+| `medium: n8n` accepted by activity endpoint          | Confirmed | All exposed actions passed in all three Production sandbox modules                            |
+| `medium: n8n` / `channel: n8n` registration accepted | Confirmed | Activity and State Changed hooks registered and removed in all three modules                  |
+| Public webhook callback delivered                    | Pending   | Requires a public callback and matching/non-matching delivery runs in the production sandbox  |
+| Automation hook removed                              | Confirmed | Every temporary hook was removed during the successful live run                               |
+| Seeded `N8N-TEST` entry                              | Confirmed | Created records TSK00006, PRJ00005, and MMB00003, then removed them and their duplicates      |
+| Module and user-reference live fields                | Partial   | Dynamic options were loaded and forms submitted; exact reference-field inventory not recorded |
+| Nested section/tab and unsupported live cases        | Pending   | Covered synthetically; production form coverage is not yet recorded                           |
+| Two distinct assignable users                        | Pending   | Not yet evidenced                                                                             |
 
-The previous workspace/module values `2306`/`19295` were stale and must not be used for this P0
-sandbox.
+The retired App02 workspace/module IDs (`2307`, `19296`, and `19305`) must not be used for this
+production sandbox. The live harness resolves current IDs from exact names.
 
 ## Tooling, package, and security
 
@@ -112,5 +113,5 @@ sandbox.
 
 Change the decision to **READY** only after every mandatory Pending/Blocked item above has direct
 evidence, the exact release commit is reviewed and pushed, and the published package is
-clean-installed and smoke-tested. Automated contract tests cannot substitute for the live App02 and
-publishing checks.
+clean-installed and smoke-tested. Automated contract tests cannot substitute for the live
+production-sandbox and publishing checks.

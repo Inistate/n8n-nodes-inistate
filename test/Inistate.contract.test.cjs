@@ -24,8 +24,8 @@ test('selects Production by default and App02 only when requested', () => {
 });
 
 test('builds activity headers with the n8n medium and metadata headers without it', () => {
-	assert.deepEqual(buildApiHeaders('2307'), { wsId: '2307', medium: 'n8n' });
-	assert.deepEqual(buildApiHeaders('2307', false), { wsId: '2307' });
+	assert.deepEqual(buildApiHeaders('9001'), { wsId: '9001', medium: 'n8n' });
+	assert.deepEqual(buildApiHeaders('9001', false), { wsId: '9001' });
 });
 
 test('extracts only resource-mapper field values', () => {
@@ -71,22 +71,127 @@ test('maps reference selections to flat Inistate activity payload fields', () =>
 	);
 });
 
+test('maps expression reference objects for reference fields', () => {
+	const moduleOptions = toReferenceFieldOptions(7, [{ id: 9867845, value: 'PJ001' }]);
+	const userOptions = toReferenceFieldOptions(20, [
+		{ id: 9867820, value: 'Project Owner', username: 'owner@example.com' },
+	]);
+
+	assert.deepEqual(
+		getMappedFieldValues({
+			mappingMode: 'defineBelow',
+			value: {
+				Project: { id: 9867845, name: 'PJ001' },
+				Owner: { id: 9867820, name: 'Project Owner', username: 'owner@example.com' },
+			},
+			matchingColumns: [],
+			schema: [
+				{ id: 'Project', type: 'options', options: moduleOptions },
+				{ id: 'Owner', type: 'options', options: userOptions },
+			],
+			attemptToConvertTypes: false,
+			convertFieldsToString: false,
+		}),
+		{
+			Project: 'PJ001',
+			ProjectId: 9867845,
+			Owner: 'Project Owner',
+			OwnerId: 9867820,
+			OwnerUsername: 'owner@example.com',
+		},
+	);
+});
+
+test('maps natural trigger values to matching reference options', () => {
+	const moduleOptions = toReferenceFieldOptions(7, [{ id: 9867845, value: 'PJ001' }]);
+	const userOptions = toReferenceFieldOptions(20, [
+		{ id: 9867820, value: 'Project Owner', username: 'owner@example.com' },
+	]);
+
+	assert.deepEqual(
+		getMappedFieldValues({
+			mappingMode: 'defineBelow',
+			value: {
+				ProjectFromCode: 'PJ001',
+				ProjectFromId: 9867845,
+				Owner: { Text: 'owner@example.com', Id: 9867820 },
+			},
+			matchingColumns: [],
+			schema: [
+				{ id: 'ProjectFromCode', type: 'options', options: moduleOptions },
+				{ id: 'ProjectFromId', type: 'options', options: moduleOptions },
+				{ id: 'Owner', type: 'options', options: userOptions },
+			],
+			attemptToConvertTypes: false,
+			convertFieldsToString: false,
+		}),
+		{
+			ProjectFromCode: 'PJ001',
+			ProjectFromCodeId: 9867845,
+			ProjectFromId: 'PJ001',
+			ProjectFromIdId: 9867845,
+			Owner: 'Project Owner',
+			OwnerId: 9867820,
+			OwnerUsername: 'owner@example.com',
+		},
+	);
+});
+
+test('does not guess when a trigger value matches multiple reference options', () => {
+	const duplicateOptions = toReferenceFieldOptions(7, [
+		{ id: 9867845, value: 'PJ001' },
+		{ id: 9867999, value: 'PJ001' },
+	]);
+
+	assert.deepEqual(
+		getMappedFieldValues({
+			mappingMode: 'defineBelow',
+			value: { Project: 'PJ001' },
+			matchingColumns: [],
+			schema: [{ id: 'Project', type: 'options', options: duplicateOptions }],
+			attemptToConvertTypes: false,
+			convertFieldsToString: false,
+		}),
+		{ Project: 'PJ001' },
+	);
+});
+
+test('does not reinterpret expression objects for non-reference fields', () => {
+	const metadata = { id: 9867845, name: 'PJ001' };
+
+	assert.deepEqual(
+		getMappedFieldValues({
+			mappingMode: 'defineBelow',
+			value: { Metadata: metadata },
+			matchingColumns: [],
+			schema: [{ id: 'Metadata', type: 'object' }],
+			attemptToConvertTypes: false,
+			convertFieldsToString: false,
+		}),
+		{ Metadata: metadata },
+	);
+});
+
 test('builds all five protected P0 action request bodies', () => {
 	assert.deepEqual(
-		buildActionBody({ operation: 'create', moduleId: '19296', fields: { title: 'Task' } }),
-		{ activityId: 'create', moduleId: '19296', payload: { title: 'Task' } },
+		buildActionBody({
+			operation: 'create',
+			moduleId: '9101',
+			fields: { title: 'Task' },
+		}),
+		{ activityId: 'create', moduleId: '9101', payload: { title: 'Task' } },
 	);
 
 	assert.deepEqual(
 		buildActionBody({
 			operation: 'update',
-			moduleId: '19296',
+			moduleId: '9101',
 			documentId: 'N8N-TEST00001',
 			fields: { priority: 'High' },
 		}),
 		{
 			activityId: 'edit',
-			moduleId: '19296',
+			moduleId: '9101',
 			entry: 'N8N-TEST00001',
 			payload: { priority: 'High' },
 		},
@@ -95,14 +200,14 @@ test('builds all five protected P0 action request bodies', () => {
 	assert.deepEqual(
 		buildActionBody({
 			operation: 'performActivity',
-			moduleId: '19296',
+			moduleId: '9101',
 			documentId: 'N8N-TEST00001',
 			activityId: 'activity-1',
 			fields: null,
 		}),
 		{
 			activityId: 'activity-1',
-			moduleId: '19296',
+			moduleId: '9101',
 			entry: 'N8N-TEST00001',
 			payload: {},
 		},
@@ -111,13 +216,13 @@ test('builds all five protected P0 action request bodies', () => {
 	assert.deepEqual(
 		buildActionBody({
 			operation: 'changeState',
-			moduleId: '19296',
+			moduleId: '9101',
 			documentId: 'N8N-TEST00001',
 			stateName: 'Completed',
 		}),
 		{
 			activityId: 'changeStatus',
-			moduleId: '19296',
+			moduleId: '9101',
 			entry: 'N8N-TEST00001',
 			state: 'Completed',
 		},
@@ -126,7 +231,7 @@ test('builds all five protected P0 action request bodies', () => {
 	assert.deepEqual(
 		buildActionBody({
 			operation: 'assign',
-			moduleId: '19296',
+			moduleId: '9101',
 			documentId: 'N8N-TEST00001',
 			username: 'tester@example.com',
 			dueDate: '2026-08-21T17:30:00+08:00',
@@ -136,7 +241,7 @@ test('builds all five protected P0 action request bodies', () => {
 			assignees: ['tester@example.com'],
 			due: '2026-08-21T17:30:00+08:00',
 			entry: 'N8N-TEST00001',
-			moduleId: '19296',
+			moduleId: '9101',
 		},
 	);
 });
@@ -145,12 +250,12 @@ test('builds the two P1 action request bodies', () => {
 	assert.deepEqual(
 		buildActionBody({
 			operation: 'delete',
-			moduleId: '19296',
+			moduleId: '9101',
 			documentId: 'N8N-TEST00001',
 		}),
 		{
 			activityId: 'delete',
-			moduleId: '19296',
+			moduleId: '9101',
 			entry: 'N8N-TEST00001',
 		},
 	);
@@ -158,12 +263,12 @@ test('builds the two P1 action request bodies', () => {
 	assert.deepEqual(
 		buildActionBody({
 			operation: 'duplicate',
-			moduleId: '19296',
+			moduleId: '9101',
 			documentId: 'N8N-TEST00001',
 		}),
 		{
 			activityId: 'duplicate',
-			moduleId: '19296',
+			moduleId: '9101',
 			entry: 'N8N-TEST00001',
 		},
 	);
@@ -173,7 +278,7 @@ test('omits an empty optional assignment due date and validates operation identi
 	assert.deepEqual(
 		buildActionBody({
 			operation: 'assign',
-			moduleId: '19296',
+			moduleId: '9101',
 			documentId: 'N8N-TEST00001',
 			username: 'tester@example.com',
 		}),
@@ -181,14 +286,14 @@ test('omits an empty optional assignment due date and validates operation identi
 			activityId: 'assign',
 			assignees: ['tester@example.com'],
 			entry: 'N8N-TEST00001',
-			moduleId: '19296',
+			moduleId: '9101',
 		},
 	);
 	assert.throws(
 		() =>
 			buildActionBody({
 				operation: 'update',
-				moduleId: '19296',
+				moduleId: '9101',
 				fields: {},
 			}),
 		/Document ID is required/,
@@ -197,7 +302,7 @@ test('omits an empty optional assignment due date and validates operation identi
 		() =>
 			buildActionBody({
 				operation: 'update',
-				moduleId: '19296',
+				moduleId: '9101',
 				documentId: '806548',
 				fields: { priority: 'Medium' },
 			}),
@@ -210,8 +315,8 @@ test('builds all protected trigger subscriptions', () => {
 	assert.equal(getTriggerItem('entryUpdated'), 'edit');
 	assert.equal(getTriggerItem('activityPerformed', 'activity-1'), 'activity-1');
 	assert.throws(() => getTriggerItem('activityPerformed'), /Activity ID is required/);
-	assert.deepEqual(buildSubscription('19296', 'edit', 'https://n8n.example/webhook/id'), {
-		moduleId: '19296',
+	assert.deepEqual(buildSubscription('9101', 'edit', 'https://n8n.example/webhook/id'), {
+		moduleId: '9101',
 		item: 'edit',
 		type: 'activity',
 		trigger: 'execute',
@@ -219,9 +324,9 @@ test('builds all protected trigger subscriptions', () => {
 		url: 'https://n8n.example/webhook/id',
 	});
 	assert.deepEqual(
-		buildSubscription('19296', 'state-1', 'https://n8n.example/webhook/id', 'state', 'changeTo'),
+		buildSubscription('9101', 'state-1', 'https://n8n.example/webhook/id', 'state', 'changeTo'),
 		{
-			moduleId: '19296',
+			moduleId: '9101',
 			item: 'state-1',
 			type: 'state',
 			trigger: 'changeTo',
@@ -237,15 +342,15 @@ test('normalizes selector response shapes, filters, and de-duplicates values', (
 	assert.deepEqual(
 		toSearchItems(
 			[
-				{ id: 2307, name: 'N8N Node Testing' },
-				{ id: 2307, name: 'Duplicate' },
+				{ id: 9001, name: 'N8N Production Sandbox' },
+				{ id: 9001, name: 'Duplicate' },
 				{ id: 2, name: 'Other' },
 			],
 			['id'],
 			['name'],
-			'node',
+			'production',
 		),
-		[{ name: 'N8N Node Testing', value: '2307' }],
+		[{ name: 'N8N Production Sandbox', value: '9001' }],
 	);
 });
 

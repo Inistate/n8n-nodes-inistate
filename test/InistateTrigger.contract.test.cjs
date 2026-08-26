@@ -15,15 +15,15 @@ test('defines the supported Production and App02 API URLs', () => {
 });
 
 test('builds n8n automation headers', () => {
-	assert.deepEqual(buildAutomationHeaders('2307'), {
-		wsId: '2307',
+	assert.deepEqual(buildAutomationHeaders('9001'), {
+		wsId: '9001',
 		medium: 'n8n',
 	});
 });
 
 test('builds an Entry Created subscription from the legacy Zapier contract', () => {
-	assert.deepEqual(buildEntryCreatedSubscription('19296', 'https://n8n.example/webhook/inistate'), {
-		moduleId: '19296',
+	assert.deepEqual(buildEntryCreatedSubscription('9101', 'https://n8n.example/webhook/inistate'), {
+		moduleId: '9101',
 		item: 'create',
 		type: 'activity',
 		trigger: 'execute',

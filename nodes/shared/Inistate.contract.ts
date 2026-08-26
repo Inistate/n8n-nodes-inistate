@@ -27,6 +27,12 @@ export type InistateTriggerEvent = P0TriggerEvent | P1TriggerEvent;
 
 type UnknownRecord = Record<string, unknown>;
 
+interface ReferenceValue {
+	id: string | number;
+	name: string;
+	username?: string;
+}
+
 const REFERENCE_VALUE_PREFIX = '__inistate_reference__:';
 
 export interface ActionRequestInput {
@@ -58,15 +64,24 @@ export function getMappedFieldValues(
 	}
 
 	let values: IDataObject;
+	let referenceFields = new Map<string, ResourceMapperField>();
 	if ('mappingMode' in fields || 'matchingColumns' in fields || 'schema' in fields) {
-		const value = (fields as ResourceMapperValue).value;
+		const mapperFields = fields as ResourceMapperValue;
+		const value = mapperFields.value;
 		values = value && typeof value === 'object' ? { ...value } : {};
+		referenceFields = new Map(
+			(Array.isArray(mapperFields.schema) ? mapperFields.schema : [])
+				.filter(isReferenceMapperField)
+				.map((field) => [field.id, field]),
+		);
 	} else {
 		values = { ...fields };
 	}
 
 	return Object.fromEntries(
-		Object.entries(values).flatMap(([key, value]) => expandMappedField(key, value)),
+		Object.entries(values).flatMap(([key, value]) =>
+			expandMappedField(key, value, referenceFields.get(key)),
+		),
 	) as IDataObject;
 }
 
@@ -449,31 +464,126 @@ function firstPrimitive(
 	return undefined;
 }
 
-function expandMappedField(key: string, value: unknown): Array<[string, unknown]> {
-	if (typeof value !== 'string' || !value.startsWith(REFERENCE_VALUE_PREFIX)) {
+function isReferenceMapperField(field: ResourceMapperField): boolean {
+	return (
+		field.type === 'options' &&
+		Array.isArray(field.options) &&
+		field.options.some(
+			(option) =>
+				typeof option.value === 'string' && option.value.startsWith(REFERENCE_VALUE_PREFIX),
+		)
+	);
+}
+
+function expandMappedField(
+	key: string,
+	value: unknown,
+	referenceField?: ResourceMapperField,
+): Array<[string, unknown]> {
+	let decoded: ReferenceValue | undefined;
+	if (typeof value === 'string' && value.startsWith(REFERENCE_VALUE_PREFIX)) {
+		decoded = decodeReferenceOption(value);
+	} else if (referenceField) {
+		decoded = resolveReferenceValue(value, referenceField);
+	} else {
 		return [[key, value]];
+	}
+
+	if (!decoded) {
+		return [[key, value]];
+	}
+
+	return [
+		[key, decoded.name],
+		[`${key}Id`, decoded.id],
+		...(typeof decoded.username === 'string'
+			? ([[`${key}Username`, decoded.username]] as Array<[string, unknown]>)
+			: []),
+	];
+}
+
+function resolveReferenceValue(
+	value: unknown,
+	referenceField: ResourceMapperField,
+): ReferenceValue | undefined {
+	const options = (referenceField.options ?? []).flatMap((option) => {
+		const decoded = decodeReferenceOption(option.value);
+		return decoded ? [decoded] : [];
+	});
+
+	if (isRecord(value)) {
+		const supplied = normalizeReferenceRecord(value);
+		if (!supplied) {
+			return undefined;
+		}
+
+		const matchingOption = findUniqueReference(
+			options.filter((option) => String(option.id) === String(supplied.id)),
+		);
+		if (!matchingOption) {
+			return supplied;
+		}
+
+		return {
+			...supplied,
+			name: matchingOption.name,
+			username: supplied.username ?? matchingOption.username,
+		};
+	}
+
+	if (typeof value !== 'string' && typeof value !== 'number') {
+		return undefined;
+	}
+
+	const comparableValue = String(value);
+	const idMatches = options.filter((option) => String(option.id) === comparableValue);
+	const idMatch = findUniqueReference(idMatches);
+	if (idMatch) {
+		return idMatch;
+	}
+
+	return findUniqueReference(
+		options.filter(
+			(option) => option.name === comparableValue || option.username === comparableValue,
+		),
+	);
+}
+
+function findUniqueReference(values: ReferenceValue[]): ReferenceValue | undefined {
+	return values.length === 1 ? values[0] : undefined;
+}
+
+function decodeReferenceOption(value: unknown): ReferenceValue | undefined {
+	if (typeof value !== 'string' || !value.startsWith(REFERENCE_VALUE_PREFIX)) {
+		return undefined;
 	}
 
 	try {
-		const decoded = JSON.parse(value.slice(REFERENCE_VALUE_PREFIX.length)) as unknown;
-		if (
-			!isRecord(decoded) ||
-			(typeof decoded.id !== 'string' && typeof decoded.id !== 'number') ||
-			typeof decoded.name !== 'string'
-		) {
-			return [[key, value]];
-		}
-
-		return [
-			[key, decoded.name],
-			[`${key}Id`, decoded.id],
-			...(typeof decoded.username === 'string'
-				? ([[`${key}Username`, decoded.username]] as Array<[string, unknown]>)
-				: []),
-		];
+		return normalizeReferenceRecord(
+			JSON.parse(value.slice(REFERENCE_VALUE_PREFIX.length)) as unknown,
+		);
 	} catch {
-		return [[key, value]];
+		return undefined;
 	}
+}
+
+function normalizeReferenceRecord(value: unknown): ReferenceValue | undefined {
+	if (!isRecord(value)) {
+		return undefined;
+	}
+
+	const id = value.id ?? value.Id;
+	const name = value.name ?? value.Text;
+	const username = value.username ?? value.Username;
+	if ((typeof id !== 'string' && typeof id !== 'number') || typeof name !== 'string') {
+		return undefined;
+	}
+
+	return {
+		id,
+		name,
+		...(typeof username === 'string' ? { username } : {}),
+	};
 }
 
 function collectDesignElements(value: unknown, elements: UnknownRecord[]): void {

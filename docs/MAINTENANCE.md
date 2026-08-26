@@ -17,7 +17,7 @@ For every dependency update and before every release:
 2. run build, lint, all automated tests, production dependency audit, and package dry-run;
 3. clean-install the tarball in a separate n8n instance;
 4. test one form-based action, one no-form action, one state-changing action, and webhook
-   registration/delivery/removal against the dedicated App02 sandbox; and
+   registration/delivery/removal in each module of the dedicated Production sandbox; and
 5. record any newly tested n8n/Node.js versions in the README and P0 evidence log.
 
 ## Dependency updates

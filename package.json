@@ -25,7 +25,7 @@
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
 		"test": "npm run build && node --test --test-force-exit test/**/*.test.cjs",
-		"test:live:app02": "npm run build && node scripts/live-app02-smoke.cjs",
+		"test:live:production": "npm run build && node scripts/live-production-smoke.cjs",
 		"release": "n8n-node release",
 		"prepublishOnly": "n8n-node prerelease"
 	},

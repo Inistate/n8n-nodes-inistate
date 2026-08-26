@@ -3,4 +3,5 @@ dist/
 .n8n/
 .cache/
 .env
+.env.*.local
 *.log

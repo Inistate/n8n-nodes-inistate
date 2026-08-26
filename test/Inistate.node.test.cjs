@@ -23,8 +23,8 @@ test('executes two input items independently with explicit payloads and paired o
 	const parameters = [
 		{
 			operation: 'create',
-			workspaceId: { mode: 'id', value: '2307' },
-			moduleId: { mode: 'id', value: '19296' },
+			workspaceId: { mode: 'id', value: '9001' },
+			moduleId: { mode: 'id', value: '9101' },
 			fields: {
 				mappingMode: 'defineBelow',
 				value: { title: 'N8N-TEST one' },
@@ -36,8 +36,8 @@ test('executes two input items independently with explicit payloads and paired o
 		},
 		{
 			operation: 'update',
-			workspaceId: { mode: 'id', value: '2307' },
-			moduleId: { mode: 'id', value: '19296' },
+			workspaceId: { mode: 'id', value: '9001' },
+			moduleId: { mode: 'id', value: '9101' },
 			documentId: 'N8N-TEST00001',
 			fields: {
 				mappingMode: 'defineBelow',
@@ -50,7 +50,10 @@ test('executes two input items independently with explicit payloads and paired o
 		},
 	];
 	const context = {
-		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
+		getCredentials: async () => ({
+			environment: 'production',
+			username: 'tester@inistate.com',
+		}),
 		getInputData: () => [{ json: { source: 1 } }, { json: { source: 2 } }],
 		getNodeParameter(name, itemIndex, fallback, options) {
 			const value = parameters[itemIndex][name] ?? fallback;
@@ -59,16 +62,21 @@ test('executes two input items independently with explicit payloads and paired o
 		helpers: {
 			async httpRequestWithAuthentication(credentialName, options) {
 				requests.push({ credentialName, options });
-				if (options.url.endsWith('/api/Workspace/2307')) {
-					return { vectors: [{ id: 19296, menus: [{ id: 'defaultListing' }] }] };
+				if (options.url.endsWith('/api/Workspace/9001')) {
+					return { vectors: [{ id: 9101, menus: [{ id: 'defaultListing' }] }] };
 				}
 				if (options.url.endsWith('/api/workspace/list')) {
-					return { data: { list: [{ id: 806548, documentId: 'N8N-TEST00001' }] } };
+					return {
+						data: { list: [{ id: 806548, documentId: 'N8N-TEST00001' }] },
+					};
 				}
 				if (options.url.endsWith('/api/Activity/Form')) {
 					return {
 						classificationForm: {
-							default: { 'title-id': 'Existing title', 'priority-id': 'Medium' },
+							default: {
+								'title-id': 'Existing title',
+								'priority-id': 'Medium',
+							},
 							design: {
 								rows: [
 									{
@@ -105,11 +113,11 @@ test('executes two input items independently with explicit payloads and paired o
 			{
 				credentialName: 'inistateApi',
 				method: 'POST',
-				url: 'https://app02.apps.inistate.com/api/activity/',
-				headers: { wsId: '2307', medium: 'n8n' },
+				url: 'https://api.inistate.com/api/activity/',
+				headers: { wsId: '9001', medium: 'n8n' },
 				body: {
 					activityId: 'create',
-					moduleId: '19296',
+					moduleId: '9101',
 					payload: { title: 'N8N-TEST one' },
 				},
 				json: true,
@@ -117,11 +125,11 @@ test('executes two input items independently with explicit payloads and paired o
 			{
 				credentialName: 'inistateApi',
 				method: 'POST',
-				url: 'https://app02.apps.inistate.com/api/activity/',
-				headers: { wsId: '2307', medium: 'n8n' },
+				url: 'https://api.inistate.com/api/activity/',
+				headers: { wsId: '9001', medium: 'n8n' },
 				body: {
 					activityId: 'edit',
-					moduleId: '19296',
+					moduleId: '9101',
 					entry: 'N8N-TEST00001',
 					payload: { title: 'Existing title', priority: 'High' },
 				},
@@ -136,7 +144,7 @@ test('executes two input items independently with explicit payloads and paired o
 		],
 	]);
 	assert.deepEqual(requests[2].options.body, {
-		moduleId: '19296',
+		moduleId: '9101',
 		listingId: 'defaultListing',
 		withHeader: false,
 		currentPage: 0,
@@ -146,7 +154,7 @@ test('executes two input items independently with explicit payloads and paired o
 		search: 'N8N-TEST00001',
 	});
 	assert.deepEqual(requests[3].options.body, {
-		vectorId: '19296',
+		vectorId: '9101',
 		activityId: 'edit',
 		entryId: 806548,
 	});
@@ -157,8 +165,8 @@ test('does not read operation-specific properties hidden from Create', async () 
 	const requests = [];
 	const parameters = {
 		operation: 'create',
-		workspaceId: { mode: 'id', value: '2307' },
-		moduleId: { mode: 'id', value: '19296' },
+		workspaceId: { mode: 'id', value: '9001' },
+		moduleId: { mode: 'id', value: '9101' },
 		fields: {
 			mappingMode: 'defineBelow',
 			value: { title: 'N8N-TEST strict create' },
@@ -169,7 +177,10 @@ test('does not read operation-specific properties hidden from Create', async () 
 		},
 	};
 	const context = {
-		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
+		getCredentials: async () => ({
+			environment: 'production',
+			username: 'tester@inistate.com',
+		}),
 		getInputData: () => [{ json: {} }],
 		getNodeParameter(name, _itemIndex, _fallback, options) {
 			if (!Object.prototype.hasOwnProperty.call(parameters, name)) {
@@ -195,25 +206,137 @@ test('does not read operation-specific properties hidden from Create', async () 
 	]);
 });
 
+test('resolves current reference data at execution and sends display values with IDs', async () => {
+	const node = new Inistate();
+	const requests = [];
+	const parameters = {
+		operation: 'create',
+		workspaceId: { mode: 'id', value: '9001' },
+		moduleId: { mode: 'id', value: '9101' },
+		fields: {
+			mappingMode: 'defineBelow',
+			value: {
+				Project: 'Automated Test Project',
+				Owner: { Text: 'owner@example.com', Id: 9867820 },
+			},
+			matchingColumns: [],
+			schema: [
+				{
+					id: 'Project',
+					type: 'options',
+					options: [
+						{
+							name: 'PJ001',
+							value: '__inistate_reference__:{"id":9867845,"name":"PJ001"}',
+						},
+					],
+				},
+				{
+					id: 'Owner',
+					type: 'options',
+					options: [
+						{
+							name: 'Project Owner',
+							value:
+								'__inistate_reference__:{"id":9867820,"name":"Project Owner","username":"owner@example.com"}',
+						},
+					],
+				},
+			],
+			attemptToConvertTypes: false,
+			convertFieldsToString: false,
+		},
+	};
+	const context = {
+		getCredentials: async () => ({ environment: 'production' }),
+		getInputData: () => [{ json: {} }],
+		getNodeParameter(name, _itemIndex, fallback, options) {
+			return extractParameter(parameters[name] ?? fallback, options);
+		},
+		helpers: {
+			async httpRequestWithAuthentication(credentialName, options) {
+				requests.push({ credentialName, options });
+				if (options.url.endsWith('/api/Activity/Form')) {
+					return {
+						classificationForm: {
+							design: {
+								rows: [
+									{
+										items: [
+											{ id: 'project-id', fieldName: 'Project', type: 7 },
+											{ id: 'owner-id', fieldName: 'Owner', type: 20 },
+										],
+									},
+								],
+							},
+						},
+					};
+				}
+				if (options.url.endsWith('/api/activity/formselection')) {
+					return options.body.fieldId === 'project-id'
+						? [{ id: 9883123, value: 'Automated Test Project' }]
+						: [
+								{
+									id: 9867820,
+									value: 'Project Owner',
+									username: 'owner@example.com',
+								},
+							];
+				}
+				return { header: { documentId: 'TASK00001' } };
+			},
+		},
+		continueOnFail: () => false,
+		getNode: () => ({ name: 'Create entry' }),
+	};
+
+	await node.execute.call(context);
+
+	const actionRequest = requests.find(({ options }) => options.url.endsWith('/api/activity/'));
+	assert.deepEqual(actionRequest.options.body, {
+		activityId: 'create',
+		moduleId: '9101',
+		payload: {
+			Project: 'Automated Test Project',
+			ProjectId: 9883123,
+			Owner: 'Project Owner',
+			OwnerId: 9867820,
+			OwnerUsername: 'owner@example.com',
+		},
+	});
+	assert.deepEqual(
+		requests
+			.filter(({ options }) => options.url.endsWith('/api/activity/formselection'))
+			.map(({ options }) => ({ fieldId: options.body.fieldId, text: options.body.text })),
+		[
+			{ fieldId: 'project-id', text: 'Automated Test Project' },
+			{ fieldId: 'owner-id', text: 'owner@example.com' },
+		],
+	);
+});
+
 test('executes Delete and Duplicate with the Zapier-compatible activity contracts', async () => {
 	const node = new Inistate();
 	const requests = [];
 	const parameters = [
 		{
 			operation: 'delete',
-			workspaceId: { value: '2307' },
-			moduleId: { value: '19296' },
+			workspaceId: { value: '9001' },
+			moduleId: { value: '9101' },
 			documentId: 'N8N-TEST00001',
 		},
 		{
 			operation: 'duplicate',
-			workspaceId: { value: '2307' },
-			moduleId: { value: '19296' },
+			workspaceId: { value: '9001' },
+			moduleId: { value: '9101' },
 			documentId: 'N8N-TEST00002',
 		},
 	];
 	const context = {
-		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
+		getCredentials: async () => ({
+			environment: 'production',
+			username: 'tester@inistate.com',
+		}),
 		getInputData: () => [{ json: {} }, { json: {} }],
 		getNodeParameter(name, itemIndex, fallback, options) {
 			return extractParameter(parameters[itemIndex][name] ?? fallback, options);
@@ -232,8 +355,8 @@ test('executes Delete and Duplicate with the Zapier-compatible activity contract
 	assert.deepEqual(
 		requests.map(({ options }) => options.body),
 		[
-			{ activityId: 'delete', moduleId: '19296', entry: 'N8N-TEST00001' },
-			{ activityId: 'duplicate', moduleId: '19296', entry: 'N8N-TEST00002' },
+			{ activityId: 'delete', moduleId: '9101', entry: 'N8N-TEST00001' },
+			{ activityId: 'duplicate', moduleId: '9101', entry: 'N8N-TEST00002' },
 		],
 	);
 	assert.deepEqual(output, [
@@ -247,13 +370,16 @@ test('executes Delete and Duplicate with the Zapier-compatible activity contract
 test('returns a per-item error when Continue On Fail is enabled', async () => {
 	const node = new Inistate();
 	const context = {
-		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
+		getCredentials: async () => ({
+			environment: 'production',
+			username: 'tester@inistate.com',
+		}),
 		getInputData: () => [{ json: {} }],
 		getNodeParameter(name, _itemIndex, fallback, options) {
 			const values = {
 				operation: 'create',
-				workspaceId: { value: '2307' },
-				moduleId: { value: '19296' },
+				workspaceId: { value: '9001' },
+				moduleId: { value: '9101' },
 				fields: { value: { title: 'N8N-TEST' }, mappingMode: 'defineBelow' },
 			};
 			return extractParameter(values[name] ?? fallback, options);
@@ -279,7 +405,10 @@ test('returns a per-item error when Continue On Fail is enabled', async () => {
 
 function createLoadContext(parameters, responder, requests) {
 	return {
-		getCredentials: async () => ({ environment: 'app02', username: 'tester@inistate.com' }),
+		getCredentials: async () => ({
+			environment: 'production',
+			username: 'tester@inistate.com',
+		}),
 		getNodeParameter(name, fallback, options) {
 			return extractParameter(parameters[name] ?? fallback, options);
 		},
@@ -296,20 +425,24 @@ test('implements Workspace, Module, Activity, Field, State Name, State ID, and U
 	const requests = [];
 	const context = createLoadContext(
 		{
-			workspaceId: { value: '2307' },
-			moduleId: { value: '19296' },
+			workspaceId: { value: '9001' },
+			moduleId: { value: '9101' },
 			operation: 'performActivity',
 			activityId: { value: 'activity-1' },
 		},
 		(options) => {
 			if (options.url.endsWith('/api/Workspace')) {
-				return [{ id: 2307, name: 'N8N Node Testing' }];
+				return [{ id: 9001, name: 'N8N Production Sandbox' }];
 			}
-			if (options.url.endsWith('/api/Workspace/2307')) {
+			if (options.url.endsWith('/api/Workspace/9001')) {
 				return {
-					vectors: [{ id: 19296, name: 'P0 Task Tracker' }],
+					vectors: [
+						{ id: 9101, name: 'Task Tracker' },
+						{ id: 9102, name: 'Projects' },
+						{ id: 9103, name: 'Members' },
+					],
 					states: [
-						{ id: 'state-1', name: 'Backlog', module: 19296 },
+						{ id: 'state-1', name: 'Backlog', module: 9101 },
 						{ id: 'other-state', name: 'Ignore', module: 999 },
 					],
 					users: [{ username: 'tester@example.com', displayName: 'Tester' }],
@@ -345,12 +478,16 @@ test('implements Workspace, Module, Activity, Field, State Name, State ID, and U
 		requests,
 	);
 
-	assert.deepEqual(await listSearch.searchWorkspaces.call(context, 'node'), {
-		results: [{ name: 'N8N Node Testing', value: '2307' }],
+	assert.deepEqual(await listSearch.searchWorkspaces.call(context, 'production'), {
+		results: [{ name: 'N8N Production Sandbox', value: '9001' }],
 		paginationToken: '1',
 	});
 	assert.deepEqual(await listSearch.searchModules.call(context), {
-		results: [{ name: 'P0 Task Tracker', value: '19296' }],
+		results: [
+			{ name: 'Task Tracker', value: '9101' },
+			{ name: 'Projects', value: '9102' },
+			{ name: 'Members', value: '9103' },
+		],
 	});
 	assert.deepEqual(await listSearch.searchActivities.call(context), {
 		results: [{ name: 'Complete Task', value: 'activity-1' }],
@@ -385,19 +522,22 @@ test('implements Workspace, Module, Activity, Field, State Name, State ID, and U
 	const activityRequest = requests.find(({ options }) =>
 		options.url.endsWith('/api/Workspace/Module'),
 	);
-	assert.deepEqual(activityRequest.options.headers, { wsId: '2307' });
-	assert.deepEqual(activityRequest.options.body, { moduleId: '19296' });
+	assert.deepEqual(activityRequest.options.headers, { wsId: '9001' });
+	assert.deepEqual(activityRequest.options.body, { moduleId: '9101' });
 	const formRequest = requests.at(-1).options;
-	assert.deepEqual(formRequest.headers, { wsId: '2307' });
-	assert.deepEqual(formRequest.body, { vectorId: '19296', activityId: 'activity-1' });
+	assert.deepEqual(formRequest.headers, { wsId: '9001' });
+	assert.deepEqual(formRequest.body, {
+		vectorId: '9101',
+		activityId: 'activity-1',
+	});
 });
 
 test('loads Module and User form fields as dropdown options', async () => {
 	const requests = [];
 	const context = createLoadContext(
 		{
-			workspaceId: { value: '2307' },
-			moduleId: { value: '19305' },
+			workspaceId: { value: '9001' },
+			moduleId: { value: '9102' },
 			operation: 'create',
 			documentId: '',
 		},
@@ -434,7 +574,13 @@ test('loads Module and User form fields as dropdown options', async () => {
 					return [{ id: 806568, value: 'N8N Sandbox Project' }];
 				}
 				if (options.body.fieldId === 'assignee-id') {
-					return [{ id: 806569, value: 'N8N Test User One', username: 'n8n.test.user1' }];
+					return [
+						{
+							id: 806569,
+							value: 'N8N Test User One',
+							username: 'n8n.test.user1',
+						},
+					];
 				}
 			}
 
@@ -467,12 +613,12 @@ test('loads Module and User form fields as dropdown options', async () => {
 		options.url.endsWith('/api/activity/formselection'),
 	);
 	assert.equal(selectionRequests.length, 4);
-	assert.deepEqual(selectionRequests[0].options.headers, { wsId: '2307' });
+	assert.deepEqual(selectionRequests[0].options.headers, { wsId: '9001' });
 	assert.deepEqual(selectionRequests[0].options.body, {
 		activityId: 'create',
 		text: '',
 		currentPage: 0,
-		vectorId: 19305,
+		vectorId: 9102,
 		fieldId: 'project-id',
 		reference: null,
 		documentId: '',
@@ -483,8 +629,8 @@ test('does not pass an entry document ID when loading custom-activity reference 
 	const requests = [];
 	const context = createLoadContext(
 		{
-			workspaceId: { value: '2307' },
-			moduleId: { value: '19305' },
+			workspaceId: { value: '9001' },
+			moduleId: { value: '9102' },
 			operation: 'performActivity',
 			activityId: { value: 'activity-1' },
 			documentId: 'N8N00005',
