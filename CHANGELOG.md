@@ -4,6 +4,8 @@ All notable changes are recorded here. This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-27
+
 ### Added
 
 - App02 API-key credentials with `/api/profile` credential testing.
@@ -24,4 +26,4 @@ All notable changes are recorded here. This project follows Semantic Versioning.
 ### Known limitations
 
 - P0 is fixed to the App02 host.
-- Live App02 action and public webhook delivery verification remains a release blocker.
+- Full production coverage for every possible App02 field type is not yet recorded.
