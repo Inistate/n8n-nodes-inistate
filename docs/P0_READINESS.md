@@ -98,7 +98,7 @@ production sandbox. The live harness resolves current IDs from exact names.
 | Issue and security contact paths                                                  | Confirmed              | GitHub Issues and `SECURITY.md`                                                 |
 | GitHub Actions provenance workflow                                                | Confirmed (repository) | OIDC workflow pins npm 11.15.0 and uses `id-token: write`                       |
 | npm trusted publisher configured                                                  | Pending                | Must be configured on npmjs.com after the package exists under Inistate control |
-| MIT licence internally approved                                                   | Pending                | Requires an Inistate organizational decision                                    |
+| MIT licence internally approved                                                   | Confirmed (self-reported) | Inistate management confirmed approval for MIT licensing and public release      |
 | n8n Creator Portal access                                                         | Pending                | Requires an external account/login                                              |
 | Published package provenance                                                      | Pending                | No P0 version has been published                                                |
 | Published package clean-install smoke                                             | Pending                | Depends on publication                                                          |
