@@ -1,6 +1,6 @@
 # P0 readiness record
 
-Last updated: 2026-08-25 (Asia/Singapore)
+Last updated: 2026-08-27 (Asia/Singapore)
 
 Decision: **NOT READY**. The protected P0 implementation exists, automated checks pass, and live
 Production action plus hook registration/removal testing passed in `N8N Production Sandbox` for
@@ -36,7 +36,7 @@ Run evidence:
 
 ```text
 node --test --test-force-exit test/**/*.test.cjs
-43 tests, 43 passed, 0 failed
+48 tests, 48 passed, 0 failed
 
 npx tsc --noEmit
 exit code 0
@@ -45,8 +45,8 @@ npm run lint
 exit code 0 with @n8n/node-cli 0.44.5
 
 npm pack --dry-run --json
-exit code 0; 84 files; both nodes, credentials, metadata, icons, action/event modules, and shared
-runtime included
+exit code 0; 87 files; both nodes, credentials, metadata, icons, action/event modules, shared
+runtime, credential guide, and example workflow included
 ```
 
 ## Sandbox and API
@@ -82,7 +82,7 @@ production sandbox. The live harness resolves current IDs from exact names.
 | No runtime dependency/filesystem/environment access | Confirmed | Package has no runtime dependencies; runtime source uses n8n helpers only   |
 | Production dependency audit                         | Confirmed | `npm audit --omit=dev`: zero vulnerabilities                                |
 | Full development dependency audit                   | Partial   | 13 upstream advisories remain inside latest `@n8n/node-cli` transitive tree |
-| Package content                                     | Confirmed | `npm pack --dry-run --json` contains 84 intended files only                 |
+| Package content                                     | Confirmed | `npm pack --dry-run --json` contains 87 intended files only                 |
 | Separate clean-install smoke                        | Confirmed | Tarball loaded action and trigger v1 in a clean n8n 2.35.5 node catalog     |
 | Secrets excluded from repository                    | Confirmed | No API key is stored in source or tests; credential is password-typed       |
 | Diff inspection                                     | Confirmed | `git diff` and `git diff --check` available before acceptance               |

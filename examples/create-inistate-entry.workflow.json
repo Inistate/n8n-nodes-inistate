@@ -1,0 +1,65 @@
+{
+	"name": "Create an Inistate entry",
+	"nodes": [
+		{
+			"parameters": {},
+			"type": "n8n-nodes-base.manualTrigger",
+			"typeVersion": 1,
+			"position": [-240, 0],
+			"id": "bcad789e-28ab-45a3-9143-784459bd1588",
+			"name": "When clicking Execute workflow"
+		},
+		{
+			"parameters": {
+				"resource": "entry",
+				"operation": "create",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"fields": {
+					"mappingMode": "defineBelow",
+					"value": {},
+					"matchingColumns": [],
+					"schema": [],
+					"attemptToConvertTypes": false,
+					"convertFieldsToString": false
+				}
+			},
+			"type": "n8n-nodes-inistate.inistate",
+			"typeVersion": 1,
+			"position": [0, 0],
+			"id": "6adb8e76-63cd-4ee5-bca0-c88c7f6e4ce7",
+			"name": "Create an Inistate entry"
+		}
+	],
+	"pinData": {},
+	"connections": {
+		"When clicking Execute workflow": {
+			"main": [
+				[
+					{
+						"node": "Create an Inistate entry",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"active": false,
+	"settings": {
+		"executionOrder": "v1"
+	},
+	"versionId": "6bed25f4-c18e-4f4c-a32e-1e4b4fb704fb",
+	"meta": {
+		"templateCredsSetupCompleted": false
+	},
+	"tags": []
+}
