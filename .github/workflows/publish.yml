@@ -37,7 +37,7 @@ jobs:
         run: npm install --global npm@11.15.0
 
       - name: Install locked dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Publish with provenance
         run: npm run release
