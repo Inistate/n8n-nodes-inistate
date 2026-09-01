@@ -4,11 +4,21 @@ All notable changes are recorded here. This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-01
+
+### Changed
+
+- **Breaking:** the credential's **Environment** dropdown is replaced by a free-form **Base URL**
+  field, still shown only for `@inistate.com` and `@gneysoftware.com` usernames. Non-internal
+  hosts are rejected for other usernames, and a custom URL must use `https://`.
+- Credentials saved with the old `environment` value now resolve to `https://api.inistate.com`;
+  internal users must re-enter their host in **Base URL**.
+
 ## [0.1.0] - 2026-08-27
 
 ### Added
 
-- App02 API-key credentials with `/api/profile` credential testing.
+- API-key credentials with `/api/profile` credential testing.
 - Inistate action node with Create, Update, Perform Activity, Change State, and Assign.
 - Dynamic form mapping with recursive nested-section/tab traversal and supported field types.
 - Workspace, Module, Activity, Field, State, and User selectors.
@@ -20,10 +30,10 @@ All notable changes are recorded here. This project follows Semantic Versioning.
 
 ### Fixed
 
-- Accept App02 automation-hook registration IDs returned as a direct string as well as an object
+- Accept automation-hook registration IDs returned as a direct string as well as an object
   `id` value.
 
 ### Known limitations
 
-- P0 is fixed to the App02 host.
-- Full production coverage for every possible App02 field type is not yet recorded.
+- P0 is fixed to a single internal API host.
+- Full production coverage for every possible API field type is not yet recorded.

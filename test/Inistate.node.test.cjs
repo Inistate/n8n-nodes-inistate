@@ -51,7 +51,7 @@ test('executes two input items independently with explicit payloads and paired o
 	];
 	const context = {
 		getCredentials: async () => ({
-			environment: 'production',
+			baseUrl: '',
 			username: 'tester@inistate.com',
 		}),
 		getInputData: () => [{ json: { source: 1 } }, { json: { source: 2 } }],
@@ -178,7 +178,7 @@ test('does not read operation-specific properties hidden from Create', async () 
 	};
 	const context = {
 		getCredentials: async () => ({
-			environment: 'production',
+			baseUrl: '',
 			username: 'tester@inistate.com',
 		}),
 		getInputData: () => [{ json: {} }],
@@ -248,7 +248,7 @@ test('resolves current reference data at execution and sends display values with
 		},
 	};
 	const context = {
-		getCredentials: async () => ({ environment: 'production' }),
+		getCredentials: async () => ({ baseUrl: '' }),
 		getInputData: () => [{ json: {} }],
 		getNodeParameter(name, _itemIndex, fallback, options) {
 			return extractParameter(parameters[name] ?? fallback, options);
@@ -334,7 +334,7 @@ test('executes Delete and Duplicate with the Zapier-compatible activity contract
 	];
 	const context = {
 		getCredentials: async () => ({
-			environment: 'production',
+			baseUrl: '',
 			username: 'tester@inistate.com',
 		}),
 		getInputData: () => [{ json: {} }, { json: {} }],
@@ -371,7 +371,7 @@ test('returns a per-item error when Continue On Fail is enabled', async () => {
 	const node = new Inistate();
 	const context = {
 		getCredentials: async () => ({
-			environment: 'production',
+			baseUrl: '',
 			username: 'tester@inistate.com',
 		}),
 		getInputData: () => [{ json: {} }],
@@ -406,7 +406,7 @@ test('returns a per-item error when Continue On Fail is enabled', async () => {
 function createLoadContext(parameters, responder, requests) {
 	return {
 		getCredentials: async () => ({
-			environment: 'production',
+			baseUrl: '',
 			username: 'tester@inistate.com',
 		}),
 		getNodeParameter(name, fallback, options) {

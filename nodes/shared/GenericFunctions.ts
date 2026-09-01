@@ -17,10 +17,10 @@ import {
 	buildApiHeaders,
 	extractCollection,
 	extractFormElements,
-	getInistateBaseUrl,
 	getFormDefaultValues,
 	getMappedFieldValues,
 	mapFormFields,
+	resolveInistateBaseUrl,
 	toReferenceFieldOptions,
 	toFieldSearchItems,
 	toSearchItems,
@@ -33,7 +33,7 @@ export async function inistateApiRequest(
 	options: IHttpRequestOptions,
 ): Promise<unknown> {
 	const credentials = await context.getCredentials('inistateApi');
-	const baseUrl = getInistateBaseUrl(credentials.environment);
+	const baseUrl = resolveInistateBaseUrl(credentials.baseUrl);
 
 	try {
 		return await context.helpers.httpRequestWithAuthentication.call(
@@ -48,7 +48,7 @@ export async function inistateApiRequest(
 	} catch (error) {
 		throw new NodeApiError(context.getNode(), error as JsonObject, {
 			description:
-				'Check the Inistate credential, selected environment, workspace and module access, and request values, then try again.',
+				'Check the Inistate credential, workspace and module access, and request values, then try again.',
 		});
 	}
 }

@@ -7,7 +7,7 @@ const {
 	buildSubscription,
 	extractCollection,
 	extractFormElements,
-	getInistateBaseUrl,
+	resolveInistateBaseUrl,
 	getFormDefaultValues,
 	getMappedFieldValues,
 	getTriggerItem,
@@ -17,10 +17,19 @@ const {
 	toSearchItems,
 } = require('../dist/nodes/shared/Inistate.contract.js');
 
-test('selects Production by default and App02 only when requested', () => {
-	assert.equal(getInistateBaseUrl(undefined), 'https://api.inistate.com');
-	assert.equal(getInistateBaseUrl('production'), 'https://api.inistate.com');
-	assert.equal(getInistateBaseUrl('app02'), 'https://app02.apps.inistate.com');
+test('falls back to the production host and normalises a custom base URL', () => {
+	assert.equal(resolveInistateBaseUrl(undefined), 'https://api.inistate.com');
+	assert.equal(resolveInistateBaseUrl(''), 'https://api.inistate.com');
+	assert.equal(resolveInistateBaseUrl('   '), 'https://api.inistate.com');
+	assert.equal(
+		resolveInistateBaseUrl('https://internal.test.example.com'),
+		'https://internal.test.example.com',
+	);
+	assert.equal(
+		resolveInistateBaseUrl('https://internal.test.example.com//'),
+		'https://internal.test.example.com',
+	);
+	assert.equal(resolveInistateBaseUrl('http://insecure.test.example.com'), 'https://api.inistate.com');
 });
 
 test('builds activity headers with the n8n medium and metadata headers without it', () => {

@@ -27,10 +27,9 @@ includes screenshots of this process. API endpoints are documented in the
 2. Search for **Inistate API**.
 3. Enter the Inistate username associated with the account.
 4. Paste the API key into **API Key**.
-5. Select an environment:
-   - **Inistate** uses `https://api.inistate.com` and is the normal choice.
-   - **App02** uses `https://app02.apps.inistate.com` and is shown only for internal
-     `@inistate.com` or `@gneysoftware.com` usernames.
+5. Leave **Base URL** at its default, `https://api.inistate.com`. The field appears only for
+   internal `@inistate.com` and `@gneysoftware.com` usernames, and is used only when Inistate
+   has given you another host.
 6. Select **Save**. n8n tests the key with `GET /api/profile`.
 
 At request time, the node sends:
@@ -57,7 +56,7 @@ operations, especially Delete, against disposable records before enabling a prod
 ### Credential test returns 401 or 403
 
 - Confirm that the entire API key was copied without leading or trailing whitespace.
-- Confirm that the key is active and belongs to the intended Inistate environment.
+- Confirm that the key is active and belongs to the host set in **Base URL**.
 - Generate a new key if the current key was revoked or rotated.
 
 ### A workspace, module, activity, state, or user is missing
@@ -67,10 +66,10 @@ operations, especially Delete, against disposable records before enabling a prod
 - Select the module before loading activities, states, form fields, or users.
 - Use **By ID** only when the object isn't available in the list and you know its current ID.
 
-### App02 isn't available
+### The Base URL field isn't shown
 
-App02 is intentionally restricted to internal `@inistate.com` and `@gneysoftware.com` usernames.
-External users must select the production **Inistate** environment.
+The field is restricted to internal `@inistate.com` and `@gneysoftware.com` usernames. Every other
+account uses `https://api.inistate.com`, which needs no configuration.
 
 ### A trigger activates but receives no event
 

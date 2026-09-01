@@ -84,14 +84,15 @@ You need an Inistate account and API key:
 2. Generate or copy an API key.
 3. In n8n, create an **Inistate API** credential.
 4. Enter your Inistate username and API key.
-5. Keep **Inistate** selected for the production API, then test and save the credential.
+5. Leave **Base URL** at its default for the production API, then test and save the credential.
 
 The credential sends the key as `Authorization: fsk <API key>` and tests it with
 `GET /api/profile`. The key must have access to every workspace, module, entry action, user, and
 automation-hook operation used by the workflow. Use a dedicated least-privilege key when possible.
 
-The **App02** environment is visible only for `@inistate.com` and `@gneysoftware.com` usernames and
-is intended for internal testing. Other users should use the production **Inistate** environment.
+The **Base URL** field is visible only for `@inistate.com` and `@gneysoftware.com` usernames and is
+intended for internal testing. Every other account uses the production API at
+`https://api.inistate.com`.
 
 See the [complete credential guide](docs/CREDENTIALS.md) for security and troubleshooting details.
 
@@ -144,8 +145,8 @@ Earlier n8n versions have not been validated and are not currently supported.
 
 ## Known limitations
 
-- Supported API environments are Inistate Production and the internal App02 environment. Custom
-  API hosts and customer-managed on-premise hosts are not supported in `0.1.0`.
+- The supported API host is Inistate Production. Customer-managed on-premise hosts are not
+  supported in `0.1.0`.
 - Inistate's current automation-hook contract doesn't expose a signing secret or signature header,
   so this node can't cryptographically verify webhook authenticity.
 - Duplicate, Delete, and State Changed remain release-candidate functionality until the complete
