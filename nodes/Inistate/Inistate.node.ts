@@ -33,12 +33,6 @@ export class Inistate implements INodeType {
 		credentials: [{ name: 'inistateApi', required: true }],
 		properties: [
 			{
-				displayName: 'The API host is configured in the Inistate credential.',
-				name: 'hostNotice',
-				type: 'notice',
-				default: '',
-			},
-			{
 				displayName: 'Resource',
 				name: 'resource',
 				type: 'options',

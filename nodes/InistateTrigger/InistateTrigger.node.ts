@@ -42,12 +42,6 @@ export class InistateTrigger implements INodeType {
 		],
 		properties: [
 			{
-				displayName: 'The API host is configured in the Inistate credential.',
-				name: 'hostNotice',
-				type: 'notice',
-				default: '',
-			},
-			{
 				displayName: 'Trigger On',
 				name: 'event',
 				type: 'options',
