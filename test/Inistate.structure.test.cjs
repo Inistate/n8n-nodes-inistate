@@ -15,6 +15,12 @@ const {
 const {
 	performActivityAction,
 } = require('../dist/nodes/Inistate/actions/entry/performActivity.operation.js');
+const { getEntryAction } = require('../dist/nodes/Inistate/actions/entry/get.operation.js');
+const { getAllEntriesAction } = require('../dist/nodes/Inistate/actions/entry/getAll.operation.js');
+const { getFormAction } = require('../dist/nodes/Inistate/actions/entry/getForm.operation.js');
+const {
+	getHistoryAction,
+} = require('../dist/nodes/Inistate/actions/entry/getHistory.operation.js');
 const { updateEntryAction } = require('../dist/nodes/Inistate/actions/entry/update.operation.js');
 const { InistateTrigger } = require('../dist/nodes/InistateTrigger/InistateTrigger.node.js');
 const {
@@ -24,7 +30,9 @@ const { entryCreatedEvent } = require('../dist/nodes/InistateTrigger/events/entr
 const { entryUpdatedEvent } = require('../dist/nodes/InistateTrigger/events/entryUpdated.event.js');
 const { stateChangedEvent } = require('../dist/nodes/InistateTrigger/events/stateChanged.event.js');
 
-test('advertises exactly the seven action modules registered by the action node', () => {
+test('advertises exactly the eleven action modules registered by the action node', () => {
+	// Declaration order here is the write modules followed by the read modules; the
+	// operation dropdown is sorted by display name, which is asserted separately.
 	const definitions = [
 		assignEntryAction,
 		changeStateAction,
@@ -33,6 +41,10 @@ test('advertises exactly the seven action modules registered by the action node'
 		duplicateEntryAction,
 		performActivityAction,
 		updateEntryAction,
+		getEntryAction,
+		getAllEntriesAction,
+		getFormAction,
+		getHistoryAction,
 	];
 	const operationProperty = new Inistate().description.properties.find(
 		(property) => property.name === 'operation',
@@ -40,11 +52,41 @@ test('advertises exactly the seven action modules registered by the action node'
 
 	assert.deepEqual(
 		definitions.map(({ operation }) => operation),
-		['assign', 'changeState', 'create', 'delete', 'duplicate', 'performActivity', 'update'],
+		[
+			'assign',
+			'changeState',
+			'create',
+			'delete',
+			'duplicate',
+			'performActivity',
+			'update',
+			'get',
+			'getAll',
+			'getForm',
+			'getHistory',
+		],
 	);
 	assert.deepEqual(
 		operationProperty.options.map(({ value }) => value),
-		definitions.map(({ operation }) => operation),
+		[
+			'assign',
+			'changeState',
+			'create',
+			'delete',
+			'duplicate',
+			'get',
+			'getForm',
+			'getHistory',
+			'getAll',
+			'performActivity',
+			'update',
+		],
+	);
+	assert.deepEqual(
+		operationProperty.options.map(({ name }) => name),
+		[...operationProperty.options.map(({ name }) => name)].sort((first, second) =>
+			first.localeCompare(second, 'en'),
+		),
 	);
 	for (const definition of definitions) {
 		assert.equal(definition.option.value, definition.operation);
@@ -57,6 +99,10 @@ test('advertises exactly the seven action modules registered by the action node'
 		create: ['fields'],
 		delete: ['deleteWarning', 'documentId'],
 		duplicate: ['documentId'],
+		get: ['entryId'],
+		getAll: ['listing', 'returnAll', 'limit', 'options'],
+		getForm: ['formActivity', 'formEntryId'],
+		getHistory: ['entryId', 'returnAll', 'limit'],
 		performActivity: ['documentId', 'activityId', 'fields'],
 		update: ['documentId', 'fields'],
 	};
@@ -124,8 +170,10 @@ test('prefixes example placeholders with e.g.', () => {
 			return;
 		}
 		if (!value || typeof value !== 'object') return;
+		// A collection's placeholder is its add-button label, not an example value.
+		const isCollection = value.type === 'collection' || value.type === 'fixedCollection';
 		for (const [key, child] of Object.entries(value)) {
-			if (key === 'placeholder' && typeof child === 'string' && child.length > 0) {
+			if (key === 'placeholder' && typeof child === 'string' && child.length > 0 && !isCollection) {
 				placeholders.push(child);
 			} else {
 				collect(child);

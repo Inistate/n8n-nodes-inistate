@@ -1,6 +1,7 @@
 import type { INodeProperties } from 'n8n-workflow';
 
 import type { InistateOperation, P0Operation } from '../../../shared/Inistate.contract';
+import type { InistateReadOperation } from '../../../shared/InistateRead.contract';
 
 export const listMode = (searchListMethod: string) => ({
 	displayName: 'From List',
@@ -90,5 +91,50 @@ export function fieldsProperty(
 				allowEmptyValues: true,
 			},
 		},
+	};
+}
+
+/**
+ * Read operations accept the document ID or the numeric entry ID, so this deliberately
+ * does not carry the write operations' numeric-ID rejection: a workflow resuming from a
+ * trigger has `header.id` (numeric) and `header.documentId` and can pass either.
+ */
+export function entryIdProperty(
+	operation: InistateReadOperation,
+	required = true,
+): INodeProperties {
+	return {
+		displayName: 'Entry ID',
+		name: 'entryId',
+		type: 'string',
+		default: '',
+		required,
+		placeholder: 'e.g. N8N-TEST00001',
+		description:
+			'The document ID (for example N8N-TEST00001) or the numeric entry ID. Trigger payloads carry both in their header.',
+		displayOptions: { show: { operation: [operation] } },
+	};
+}
+
+export function returnAllProperty(operation: InistateReadOperation): INodeProperties {
+	return {
+		displayName: 'Return All',
+		name: 'returnAll',
+		type: 'boolean',
+		default: false,
+		description: 'Whether to return all results or only up to a given limit',
+		displayOptions: { show: { operation: [operation] } },
+	};
+}
+
+export function limitProperty(operation: InistateReadOperation): INodeProperties {
+	return {
+		displayName: 'Limit',
+		name: 'limit',
+		type: 'number',
+		typeOptions: { minValue: 1 },
+		default: 50,
+		description: 'Max number of results to return',
+		displayOptions: { show: { operation: [operation], returnAll: [false] } },
 	};
 }

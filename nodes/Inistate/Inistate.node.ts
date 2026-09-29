@@ -1,5 +1,4 @@
 import type {
-	IDataObject,
 	IExecuteFunctions,
 	JsonObject,
 	INodeExecutionData,
@@ -14,8 +13,8 @@ import {
 	executeEntryAction,
 } from './actions/entry';
 import { moduleProperty, workspaceProperty } from './actions/entry/properties';
-import { listSearch, resourceMapping } from '../shared/GenericFunctions';
-import type { InistateOperation } from '../shared/Inistate.contract';
+import { listSearch, loadOptions, resourceMapping } from '../shared/GenericFunctions';
+import type { InistateNodeOperation } from '../shared/InistateRead.contract';
 
 export class Inistate implements INodeType {
 	description: INodeTypeDescription = {
@@ -25,7 +24,7 @@ export class Inistate implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
-		description: 'Create and manage entries in Inistate',
+		description: 'Read and manage entries in Inistate',
 		defaults: { name: 'Inistate' },
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
@@ -60,7 +59,7 @@ export class Inistate implements INodeType {
 		],
 	};
 
-	methods = { listSearch, resourceMapping };
+	methods = { listSearch, loadOptions, resourceMapping };
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
@@ -68,7 +67,7 @@ export class Inistate implements INodeType {
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
-				const operation = this.getNodeParameter('operation', itemIndex) as InistateOperation;
+				const operation = this.getNodeParameter('operation', itemIndex) as InistateNodeOperation;
 				const workspaceId = String(
 					this.getNodeParameter('workspaceId', itemIndex, '', {
 						extractValue: true,
@@ -79,17 +78,12 @@ export class Inistate implements INodeType {
 						extractValue: true,
 					}),
 				);
-				const response = await executeEntryAction(
-					this,
-					operation,
-					itemIndex,
-					workspaceId,
-					moduleId,
-				);
-				returnData.push({
-					json: normalizeResponse(operation, response),
-					pairedItem: { item: itemIndex },
-				});
+				// A read operation can answer with any number of records, so one input item
+				// may fan out to many output items or to none at all.
+				const results = await executeEntryAction(this, operation, itemIndex, workspaceId, moduleId);
+				for (const json of results) {
+					returnData.push({ json, pairedItem: { item: itemIndex } });
+				}
 			} catch (error) {
 				if (this.continueOnFail()) {
 					returnData.push({
@@ -123,16 +117,4 @@ export class Inistate implements INodeType {
 
 		return [returnData];
 	}
-}
-
-function normalizeResponse(operation: InistateOperation, response: unknown): IDataObject {
-	if (operation === 'delete') {
-		return { deleted: true };
-	}
-
-	if (typeof response === 'object' && response !== null && !Array.isArray(response)) {
-		return response as IDataObject;
-	}
-
-	return { data: response as IDataObject[keyof IDataObject] };
 }

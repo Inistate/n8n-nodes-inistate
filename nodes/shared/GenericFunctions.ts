@@ -5,6 +5,7 @@ import type {
 	IHookFunctions,
 	IHttpRequestOptions,
 	ILoadOptionsFunctions,
+	INodeListSearchItems,
 	INodeListSearchResult,
 	INodePropertyOptions,
 	JsonObject,
@@ -89,6 +90,41 @@ async function getModuleStates(
 	});
 }
 
+/**
+ * Listings are resolved by name by POST /api/mcp/list, so the selector offers names as
+ * values. "Everything" is the server default and is sent as an empty listing.
+ */
+async function getModuleListings(
+	context: InistateRequestFunctions,
+	workspaceId: string,
+	moduleId: string,
+): Promise<unknown[]> {
+	const response = await getWorkspaceDetails(context, workspaceId);
+	const targetModule = extractCollection(response, 'vectors').find(
+		(value) =>
+			typeof value === 'object' &&
+			value !== null &&
+			!Array.isArray(value) &&
+			String((value as Record<string, unknown>).id) === moduleId,
+	) as Record<string, unknown> | undefined;
+
+	return Array.isArray(targetModule?.menus) ? targetModule.menus : [];
+}
+
+/**
+ * The standard activities POST /api/mcp/form accepts by id. searchFormActivities appends
+ * the module's custom activities to these.
+ */
+const standardFormActivities: INodeListSearchItems[] = [
+	{ name: 'Change State', value: 'changeState' },
+	{ name: 'Comment', value: 'comment' },
+	{ name: 'Create', value: 'create' },
+	{ name: 'Delete', value: 'delete' },
+	{ name: 'Duplicate', value: 'duplicate' },
+	{ name: 'Edit', value: 'edit' },
+	{ name: 'View', value: 'view' },
+];
+
 async function getModuleForm(
 	context: InistateRequestFunctions,
 	workspaceId: string,
@@ -120,7 +156,12 @@ export async function resolveMappedFieldValues(
 	fields: ResourceMapperValue | IDataObject | null | undefined,
 ): Promise<IDataObject> {
 	const mappedValues = getMappedFieldValues(fields);
-	if (!fields || typeof fields !== 'object' || !('value' in fields) || !Array.isArray(fields.schema)) {
+	if (
+		!fields ||
+		typeof fields !== 'object' ||
+		!('value' in fields) ||
+		!Array.isArray(fields.schema)
+	) {
 		return mappedValues;
 	}
 
@@ -185,13 +226,7 @@ export async function resolveMappedFieldValues(
 				if (pageOptions.length === 0) {
 					break;
 				}
-				reference = findCurrentReference(
-					fieldName,
-					fieldType,
-					pageResponse,
-					rawValue,
-					suppliedId,
-				);
+				reference = findCurrentReference(fieldName, fieldType, pageResponse, rawValue, suppliedId);
 			}
 		}
 
@@ -424,6 +459,22 @@ export const listSearch = {
 		};
 	},
 
+	async searchFormActivities(
+		this: ILoadOptionsFunctions,
+		filter?: string,
+	): Promise<INodeListSearchResult> {
+		const normalizedFilter = (filter ?? '').trim().toLocaleLowerCase();
+		const standards = standardFormActivities.filter(
+			({ name, value }) =>
+				!normalizedFilter ||
+				name.toLocaleLowerCase().includes(normalizedFilter) ||
+				String(value).toLocaleLowerCase().includes(normalizedFilter),
+		);
+		const custom = await listSearch.searchActivities.call(this, filter);
+
+		return { results: [...standards, ...custom.results] };
+	},
+
 	async searchFields(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
 		const workspaceId = getSelectedValue(this, 'workspaceId');
 		const moduleId = getSelectedValue(this, 'moduleId');
@@ -459,6 +510,34 @@ export const listSearch = {
 				filter,
 			),
 		};
+	},
+};
+
+export const loadOptions = {
+	async getListings(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+		const workspaceId = getSelectedValue(this, 'workspaceId');
+		const moduleId = getSelectedValue(this, 'moduleId');
+		const listings = await getModuleListings(this, workspaceId, moduleId);
+
+		return [
+			{ name: 'Everything', value: '' },
+			...toSearchItems(listings, ['name'], ['name']).map(({ name, value }) => ({
+				name,
+				value: String(value),
+			})),
+			{ name: 'Archive', value: 'archive' },
+		];
+	},
+
+	async getStates(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+		const workspaceId = getSelectedValue(this, 'workspaceId');
+		const moduleId = getSelectedValue(this, 'moduleId');
+		const states = await getModuleStates(this, workspaceId, moduleId);
+
+		return toSearchItems(states, ['name'], ['name']).map(({ name, value }) => ({
+			name,
+			value: String(value),
+		}));
 	},
 };
 

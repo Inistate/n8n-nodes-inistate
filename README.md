@@ -1,8 +1,8 @@
 # n8n-nodes-inistate
 
 This is an n8n community node package for connecting workflows to
-[Inistate](https://www.inistate.com/). It can create and manage Inistate entries and start n8n
-workflows when supported Inistate events occur.
+[Inistate](https://www.inistate.com/). It can read, create, and manage Inistate entries and start
+n8n workflows when supported Inistate events occur.
 
 > **Availability:** Version `0.1.0` is a release candidate and is not yet published on npm. The
 > package is currently intended for evaluation from source. Normal self-hosted installation will
@@ -48,6 +48,10 @@ All actions operate on an entry in the selected workspace and module.
 
 | Operation | What it does | Additional input |
 | --- | --- | --- |
+| Get | Reads one entry with its current state and the activities that are legal from it | Entry ID |
+| Get Many | Queries entries in a module or listing | Listing, limit, and optional filters |
+| Get History | Reads the audit trail of an entry: activities, state changes, and comments | Entry ID and limit |
+| Get Form | Describes the fields, types, options, and defaults an activity expects | Activity and optional entry ID |
 | Create | Creates an entry using the module's current create form | Dynamic form fields |
 | Update | Updates an existing entry | Document ID and dynamic form fields |
 | Perform Activity | Runs a selected Inistate activity | Document ID, activity, and any activity form fields |
@@ -57,8 +61,54 @@ All actions operate on an entry in the selected workspace and module.
 | Delete | Permanently deletes an entry | Document ID |
 
 Delete cannot be undone and always returns `{ "deleted": true }`. The other actions return the
-corresponding Inistate API response. Each incoming n8n item is processed independently and output
-items remain paired with their input items. **Continue On Fail** is supported.
+corresponding Inistate API response with its field names unchanged. Each incoming n8n item is
+processed independently and output items remain paired with their input items. **Continue On Fail**
+is supported.
+
+### Reading entries
+
+Read operations accept either identifier: the document ID (`N8N-TEST00001`) or the numeric entry
+ID that trigger payloads carry as `header.id`. Write operations still require the document ID.
+
+**Get** and **Get Form** each return one item. Their `availableActivities` object reports what the
+entry currently permits:
+
+```json
+{
+  "standard": ["edit", "changeState"],
+  "custom": ["approve", "reject"],
+  "stateFlow": {
+    "currentState": "Pending Approval",
+    "transitions": { "approve": ["Approved"], "reject": ["Rejected"] }
+  }
+}
+```
+
+**Get Many** and **Get History** return one output item per record and follow the API's `hasMore`
+paging until **Return All** is satisfied or **Limit** is reached. Get Many's options cover state,
+assignee, creator, document ID, created and updated date ranges, wildcard search, sorting, a
+comma-separated **Fields** projection, and a **Filters** JSON object for module-specific field
+filters with nested `and`/`or` support:
+
+```json
+{ "or": [{ "Status": "Active" }, { "Priority": "High" }] }
+```
+
+Narrowing **Fields** is the largest payload saving on wide modules. Listings are matched by name;
+leave the selector empty for Everything.
+
+### Resuming a workflow after a human decision
+
+The read operations close the loop between the trigger and the next write, so a resume workflow
+needs no HTTP Request node:
+
+1. **Inistate Trigger** on State Changed or Activity Performed.
+2. **Inistate → Get**, with Entry ID set to `{{ $json.header.documentId }}`.
+3. A **Switch** on `{{ $json.availableActivities.stateFlow.currentState }}`.
+4. **Inistate → Get Form** for the activity you intend to run, then **Perform Activity**.
+
+An AI agent using this node as a tool should follow the same order: Get, read
+`availableActivities`, Get Form, then Perform Activity.
 
 ### Inistate Trigger
 
@@ -150,6 +200,12 @@ Earlier n8n versions have not been validated and are not currently supported.
   so this node can't cryptographically verify webhook authenticity.
 - Duplicate, Delete, and State Changed remain release-candidate functionality until the complete
   live delivery matrix is approved.
+- Read operations call the Inistate MCP API surface, which serves display-name keyed data. Field
+  keys in a read response are therefore display names, while Create, Update, and Perform Activity
+  submit internal field names. Map between them rather than feeding a read result straight into a
+  write.
+- Get Many does not report per-entry `availableActivities`; the list endpoint doesn't return them.
+  Call Get on an entry when a workflow needs to know which activities it permits.
 - The action node is available as an AI tool. Require human approval before allowing an AI agent to
   run Delete or another irreversible business operation.
 
@@ -161,6 +217,7 @@ Earlier n8n versions have not been validated and are not currently supported.
 - [n8n community-node documentation](https://docs.n8n.io/integrations/community-nodes/)
 - [Credential guide](docs/CREDENTIALS.md)
 - [Example workflows](examples/README.md)
+- [Read-operations readiness record](docs/READ_READINESS.md)
 - [Development guide](docs/DEVELOPMENT.md)
 - [Release process](docs/RELEASE.md)
 
