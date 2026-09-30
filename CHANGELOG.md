@@ -20,6 +20,12 @@ All notable changes are recorded here. This project follows Semantic Versioning.
   standard activity forms alongside the module's custom activities.
 - Read operations accept the document ID or the numeric entry ID that trigger payloads carry, so a
   workflow can resume straight from `header.documentId` or `header.id`.
+- Approval workflow templates in `examples/`, each checked by `test/Examples.test.cjs`:
+  - **Approve Inistate entries by email**: Send and Wait approval email, with the entry re-read
+    before the answer is performed.
+  - **Wait for an approval in Inistate**: a sub-workflow that files a request and pauses until
+    it is approved or rejected in Inistate.
+  - **Daily digest of stale approvals**: Get Many by state and `Updated Before`.
 
 ### Changed
 
@@ -27,6 +33,8 @@ All notable changes are recorded here. This project follows Semantic Versioning.
   one item per record, while every write operation still produces exactly one. Output items remain
   paired with their input item.
 - Read requests are sent without the `medium: n8n` write marker.
+- **Delete** now outputs `{ "deleted": true }` instead of the raw API response body. Workflows
+  that read Delete's output should switch to that field.
 
 ### Known limitations
 

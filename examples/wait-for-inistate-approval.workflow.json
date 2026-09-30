@@ -1,0 +1,337 @@
+{
+	"name": "Wait for an approval in Inistate",
+	"nodes": [
+		{
+			"parameters": {
+				"content": "## Wait for an approval in Inistate\nA sub-workflow: it files a request in Inistate, then **pauses** until a person approves or rejects it there, and returns the decision to the workflow that called it.\n\nCall it from any workflow with **Execute Workflow**. It returns `approved`, `state` and `documentId`.\n\n**Setup**\n1. In every Inistate node pick the **same workspace and module** (a module with an approval state flow), and an Inistate credential.\n2. In **Create approval request**, map the request fields from the calling workflow's input.\n3. In **Settings**, set the approved and rejected **state names** exactly as in Inistate, how often to check, and how many checks before giving up (default: every 15 min for 24 h).\n\nA waiting execution holds no resources between checks, so long waits are cheap.",
+				"width": 600,
+				"height": 400
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"typeVersion": 1,
+			"position": [-460, -440],
+			"name": "Setup",
+			"id": "840e12a4-39c2-47f4-abff-322477984535"
+		},
+		{
+			"parameters": {
+				"inputSource": "passthrough"
+			},
+			"type": "n8n-nodes-base.executeWorkflowTrigger",
+			"typeVersion": 1.1,
+			"position": [-400, 0],
+			"name": "When called by another workflow",
+			"id": "590b94e6-34ce-4984-a22f-a37554a61d2d"
+		},
+		{
+			"parameters": {
+				"mode": "manual",
+				"assignments": {
+					"assignments": [
+						{
+							"id": "9a1cab87-ea43-456c-ab46-e039b123728c",
+							"name": "approvedState",
+							"value": "Approved",
+							"type": "string"
+						},
+						{
+							"id": "d609bb0f-ea76-4c28-a137-50e0ff03cf1d",
+							"name": "rejectedState",
+							"value": "Rejected",
+							"type": "string"
+						},
+						{
+							"id": "4354e1f9-060a-43de-af2a-9e22c4f9aab4",
+							"name": "checkEveryMinutes",
+							"value": 15,
+							"type": "number"
+						},
+						{
+							"id": "3a695301-88a3-4eee-a20c-53fe64b4c348",
+							"name": "maxChecks",
+							"value": 96,
+							"type": "number"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [-180, 0],
+			"name": "Settings",
+			"id": "32ac55d7-f456-4e30-acca-45e8fb431486"
+		},
+		{
+			"parameters": {
+				"resource": "entry",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"operation": "create",
+				"fields": {
+					"mappingMode": "defineBelow",
+					"value": {},
+					"matchingColumns": [],
+					"schema": [],
+					"attemptToConvertTypes": false,
+					"convertFieldsToString": false
+				}
+			},
+			"type": "n8n-nodes-inistate.inistate",
+			"typeVersion": 1,
+			"position": [40, 0],
+			"name": "Create approval request",
+			"id": "9f227ad5-2e80-4ce3-a8c2-f25615a36e2f"
+		},
+		{
+			"parameters": {
+				"amount": "={{ $('Settings').item.json.checkEveryMinutes }}",
+				"unit": "minutes"
+			},
+			"type": "n8n-nodes-base.wait",
+			"typeVersion": 1.1,
+			"position": [260, 0],
+			"name": "Wait",
+			"webhookId": "a5a0c93a-2e1f-44a2-a18d-ebda1835ca55",
+			"id": "d5297a91-0b6a-4ec2-a653-99652aa965ed"
+		},
+		{
+			"parameters": {
+				"resource": "entry",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"operation": "get",
+				"entryId": "={{ $('Create approval request').item.json.header.documentId }}"
+			},
+			"type": "n8n-nodes-inistate.inistate",
+			"typeVersion": 1,
+			"position": [480, 0],
+			"name": "Check the request",
+			"id": "e74fa402-efbc-44fc-ae3b-e714aacb0250"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "loose",
+						"version": 2
+					},
+					"conditions": [
+						{
+							"id": "8f5e5a31-073a-4f36-a47a-66ba6c4b7abe",
+							"leftValue": "={{ [$('Settings').item.json.approvedState, $('Settings').item.json.rejectedState].includes($json.state) }}",
+							"rightValue": "",
+							"operator": {
+								"type": "boolean",
+								"operation": "true",
+								"singleValue": true
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2.2,
+			"position": [700, 0],
+			"name": "Decided?",
+			"id": "460bdb7e-ee7a-4290-ae72-800c898e0943"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "loose",
+						"version": 2
+					},
+					"conditions": [
+						{
+							"id": "b0d20a99-7440-480b-a0f1-1d581627c984",
+							"leftValue": "={{ $runIndex < $('Settings').item.json.maxChecks }}",
+							"rightValue": "",
+							"operator": {
+								"type": "boolean",
+								"operation": "true",
+								"singleValue": true
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2.2,
+			"position": [920, 200],
+			"name": "Keep waiting?",
+			"id": "b026de67-ff0c-40de-a78c-7432661c6d67"
+		},
+		{
+			"parameters": {
+				"errorMessage": "={{ 'No decision on ' + $json.documentId + ' after ' + $('Settings').item.json.maxChecks + ' checks' }}"
+			},
+			"type": "n8n-nodes-base.stopAndError",
+			"typeVersion": 1,
+			"position": [1140, 280],
+			"name": "Give up",
+			"id": "dee5e581-816e-4328-a42d-29e616c5b897"
+		},
+		{
+			"parameters": {
+				"mode": "manual",
+				"assignments": {
+					"assignments": [
+						{
+							"id": "65f7785f-81c6-4e34-a317-52a3fc35a5f3",
+							"name": "approved",
+							"value": "={{ $json.state === $('Settings').item.json.approvedState }}",
+							"type": "boolean"
+						},
+						{
+							"id": "77a4d56a-f796-489c-a248-cc768a55563b",
+							"name": "state",
+							"value": "={{ $json.state }}",
+							"type": "string"
+						},
+						{
+							"id": "61bbae2d-f07d-4ba6-ab1e-4aa4a5e6ec3d",
+							"name": "documentId",
+							"value": "={{ $json.documentId }}",
+							"type": "string"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [920, -20],
+			"name": "Return decision",
+			"id": "05be9b3a-7533-4f45-ad8c-dc8ed41334ec"
+		}
+	],
+	"pinData": {},
+	"connections": {
+		"When called by another workflow": {
+			"main": [
+				[
+					{
+						"node": "Settings",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Settings": {
+			"main": [
+				[
+					{
+						"node": "Create approval request",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Create approval request": {
+			"main": [
+				[
+					{
+						"node": "Wait",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Wait": {
+			"main": [
+				[
+					{
+						"node": "Check the request",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Check the request": {
+			"main": [
+				[
+					{
+						"node": "Decided?",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Decided?": {
+			"main": [
+				[
+					{
+						"node": "Return decision",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Keep waiting?",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Keep waiting?": {
+			"main": [
+				[
+					{
+						"node": "Wait",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Give up",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"active": false,
+	"settings": {
+		"executionOrder": "v1"
+	},
+	"versionId": "52617be9-f33e-4707-abd0-d48edbef03cf",
+	"meta": {
+		"templateCredsSetupCompleted": false
+	},
+	"tags": []
+}

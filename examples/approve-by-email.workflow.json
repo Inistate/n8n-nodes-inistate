@@ -1,0 +1,561 @@
+{
+	"name": "Approve Inistate entries by email",
+	"nodes": [
+		{
+			"parameters": {
+				"content": "## Approve Inistate entries by email\nWhen an entry enters your approval state, the approver gets an email with **Approve** / **Reject** buttons. Their answer is performed back in Inistate as the matching activity.\n\n**Setup**\n1. In every Inistate node pick the **same workspace and module**, and an Inistate credential.\n2. In the trigger, pick the state entries wait in (e.g. *Pending Approval*).\n3. In **Settings**, set the approver, sender, the approve/reject **activity names** exactly as they appear in Inistate, and how many days to wait.\n4. In **Approve in Inistate** / **Reject in Inistate**, pick those two activities and fill any required fields.\n5. Add an SMTP credential to **Ask approver by email**.\n\nThe entry is re-read after the answer arrives: if someone already acted on it in Inistate, nothing is performed.",
+				"width": 560,
+				"height": 380
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"typeVersion": 1,
+			"position": [-460, -420],
+			"name": "Setup",
+			"id": "6cddc690-8128-45bc-af1b-1610593cb199"
+		},
+		{
+			"parameters": {
+				"event": "stateChanged",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"stateChangeDirection": "changeTo",
+				"stateId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				}
+			},
+			"type": "n8n-nodes-inistate.inistateTrigger",
+			"typeVersion": 1,
+			"position": [-400, 0],
+			"name": "Entry enters Pending Approval",
+			"webhookId": "00f5c172-97d5-45d5-aad9-fbf43d0b003b",
+			"id": "763b6d91-67c0-4bd6-a008-7721e4426264"
+		},
+		{
+			"parameters": {
+				"mode": "manual",
+				"assignments": {
+					"assignments": [
+						{
+							"id": "69e2fd1b-edd4-406c-a588-4dd8663f4d5d",
+							"name": "approverEmail",
+							"value": "approver@example.com",
+							"type": "string"
+						},
+						{
+							"id": "ef5e8426-e6cf-4131-a5e1-4f38a7463ed4",
+							"name": "fromEmail",
+							"value": "n8n@example.com",
+							"type": "string"
+						},
+						{
+							"id": "a8e359be-a63c-4fc1-a4ca-6a95170e67b0",
+							"name": "approveActivity",
+							"value": "Approve",
+							"type": "string"
+						},
+						{
+							"id": "c91aa852-4678-4a5b-a379-dd9a5638ea76",
+							"name": "rejectActivity",
+							"value": "Reject",
+							"type": "string"
+						},
+						{
+							"id": "9c2f263f-f4ec-4454-aa41-d25946a60c73",
+							"name": "waitDays",
+							"value": 3,
+							"type": "number"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [-180, 0],
+			"name": "Settings",
+			"id": "7222c3b9-81c0-42fd-a78a-cd3ae628a562"
+		},
+		{
+			"parameters": {
+				"resource": "entry",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"operation": "get",
+				"entryId": "={{ $('Entry enters Pending Approval').item.json.header.documentId }}"
+			},
+			"type": "n8n-nodes-inistate.inistate",
+			"typeVersion": 1,
+			"position": [40, 0],
+			"name": "Get entry",
+			"id": "69d98850-759f-4f52-a555-da1654fcb575"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "loose",
+						"version": 2
+					},
+					"conditions": [
+						{
+							"id": "db10093b-1146-464a-aa4d-ef348575d83e",
+							"leftValue": "={{ ($json.availableActivities?.custom ?? []).includes($('Settings').item.json.approveActivity) }}",
+							"rightValue": "",
+							"operator": {
+								"type": "boolean",
+								"operation": "true",
+								"singleValue": true
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2.2,
+			"position": [260, 0],
+			"name": "Can it be approved?",
+			"id": "3a198bf2-2a3c-46b3-a68f-f245ed66e2be"
+		},
+		{
+			"parameters": {},
+			"type": "n8n-nodes-base.noOp",
+			"typeVersion": 1,
+			"position": [480, 180],
+			"name": "Already handled",
+			"id": "9163a7fa-521f-46cb-a8be-5da14b8000b4"
+		},
+		{
+			"parameters": {
+				"mode": "manual",
+				"assignments": {
+					"assignments": [
+						{
+							"id": "e3d7de4b-f007-4e97-a9e6-d31c7b737978",
+							"name": "subject",
+							"value": "={{ 'Approval needed: ' + $json.documentId }}",
+							"type": "string"
+						},
+						{
+							"id": "129d4862-afcc-426c-a229-320ea0ec7142",
+							"name": "message",
+							"value": "={{ 'Entry ' + String($json.documentId ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + ' in ' + String($json.module ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + ' is waiting for your approval.\\n\\n' + 'Requested by: ' + String($json.createdBy ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + '\\n\\n' + Object.entries($json.data ?? {}).map(([k, v]) => String(k ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + ': ' + String((v !== null && typeof v === 'object' ? (v.value ?? JSON.stringify(v)) : v) ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c])).join('\\n') }}",
+							"type": "string"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [480, -20],
+			"name": "Build approval email",
+			"id": "26875657-ef9e-4d70-af62-81ebcd4c9ec0"
+		},
+		{
+			"parameters": {
+				"resource": "email",
+				"operation": "sendAndWait",
+				"fromEmail": "={{ $('Settings').item.json.fromEmail }}",
+				"toEmail": "={{ $('Settings').item.json.approverEmail }}",
+				"subject": "={{ $json.subject }}",
+				"message": "={{ $json.message }}",
+				"responseType": "approval",
+				"approvalOptions": {
+					"values": {
+						"approvalType": "double",
+						"approveLabel": "Approve",
+						"disapproveLabel": "Reject"
+					}
+				},
+				"options": {
+					"limitWaitTime": {
+						"values": {
+							"limitType": "afterTimeInterval",
+							"resumeAmount": "={{ $('Settings').item.json.waitDays }}",
+							"resumeUnit": "days"
+						}
+					}
+				}
+			},
+			"type": "n8n-nodes-base.emailSend",
+			"typeVersion": 2.1,
+			"position": [700, -20],
+			"name": "Ask approver by email",
+			"webhookId": "cb40319e-4cbb-4a68-a6bd-4c4a467da3c4",
+			"id": "708ce638-a678-439f-a206-b8478066fa15"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "loose",
+						"version": 2
+					},
+					"conditions": [
+						{
+							"id": "74f3e9a3-6afc-4301-a874-56d666b25e66",
+							"leftValue": "={{ typeof $json.data?.approved === 'boolean' }}",
+							"rightValue": "",
+							"operator": {
+								"type": "boolean",
+								"operation": "true",
+								"singleValue": true
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2.2,
+			"position": [920, -20],
+			"name": "Did they answer?",
+			"id": "04764d57-ce0f-47ee-a115-bbce2f42198e"
+		},
+		{
+			"parameters": {},
+			"type": "n8n-nodes-base.noOp",
+			"typeVersion": 1,
+			"position": [1140, 160],
+			"name": "No answer in time",
+			"id": "d4654e5f-ab81-4d04-a842-50e5e7b70393"
+		},
+		{
+			"parameters": {
+				"resource": "entry",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"operation": "get",
+				"entryId": "={{ $('Get entry').item.json.documentId }}"
+			},
+			"type": "n8n-nodes-inistate.inistate",
+			"typeVersion": 1,
+			"position": [1140, -40],
+			"name": "Re-read entry",
+			"id": "620ab97e-b38c-4244-ac56-7fa35cdd84ef"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "loose",
+						"version": 2
+					},
+					"conditions": [
+						{
+							"id": "7bebb3a0-ef91-4543-a67b-e3a785b35cb8",
+							"leftValue": "={{ ($json.availableActivities?.custom ?? []).includes($('Ask approver by email').item.json.data.approved ? $('Settings').item.json.approveActivity : $('Settings').item.json.rejectActivity) }}",
+							"rightValue": "",
+							"operator": {
+								"type": "boolean",
+								"operation": "true",
+								"singleValue": true
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2.2,
+			"position": [1360, -40],
+			"name": "Still actionable?",
+			"id": "a251e744-0bb9-430c-a90b-6934ece5b2f0"
+		},
+		{
+			"parameters": {},
+			"type": "n8n-nodes-base.noOp",
+			"typeVersion": 1,
+			"position": [1580, 140],
+			"name": "Changed while waiting",
+			"id": "79ad29e6-eb89-4c7f-a8c3-0bd94dc359ae"
+		},
+		{
+			"parameters": {
+				"conditions": {
+					"options": {
+						"caseSensitive": true,
+						"leftValue": "",
+						"typeValidation": "loose",
+						"version": 2
+					},
+					"conditions": [
+						{
+							"id": "be1c4026-7a79-404a-a67d-cd43edd5e1d0",
+							"leftValue": "={{ $('Ask approver by email').item.json.data.approved === true }}",
+							"rightValue": "",
+							"operator": {
+								"type": "boolean",
+								"operation": "true",
+								"singleValue": true
+							}
+						}
+					],
+					"combinator": "and"
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.if",
+			"typeVersion": 2.2,
+			"position": [1580, -60],
+			"name": "Approved?",
+			"id": "8ac412a4-717a-410f-aee5-72980c47883f"
+		},
+		{
+			"parameters": {
+				"resource": "entry",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"operation": "performActivity",
+				"documentId": "={{ $('Get entry').item.json.documentId }}",
+				"activityId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"fields": {
+					"mappingMode": "defineBelow",
+					"value": {},
+					"matchingColumns": [],
+					"schema": [],
+					"attemptToConvertTypes": false,
+					"convertFieldsToString": false
+				}
+			},
+			"type": "n8n-nodes-inistate.inistate",
+			"typeVersion": 1,
+			"position": [1800, -160],
+			"name": "Approve in Inistate",
+			"id": "c2aac4ab-b09a-4bc1-a719-7939e4a572d0"
+		},
+		{
+			"parameters": {
+				"resource": "entry",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"operation": "performActivity",
+				"documentId": "={{ $('Get entry').item.json.documentId }}",
+				"activityId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"fields": {
+					"mappingMode": "defineBelow",
+					"value": {},
+					"matchingColumns": [],
+					"schema": [],
+					"attemptToConvertTypes": false,
+					"convertFieldsToString": false
+				}
+			},
+			"type": "n8n-nodes-inistate.inistate",
+			"typeVersion": 1,
+			"position": [1800, 40],
+			"name": "Reject in Inistate",
+			"id": "1bc2c612-e89d-4b03-a2de-092be857de49"
+		}
+	],
+	"pinData": {},
+	"connections": {
+		"Entry enters Pending Approval": {
+			"main": [
+				[
+					{
+						"node": "Settings",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Settings": {
+			"main": [
+				[
+					{
+						"node": "Get entry",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Get entry": {
+			"main": [
+				[
+					{
+						"node": "Can it be approved?",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Can it be approved?": {
+			"main": [
+				[
+					{
+						"node": "Build approval email",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Already handled",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Build approval email": {
+			"main": [
+				[
+					{
+						"node": "Ask approver by email",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Ask approver by email": {
+			"main": [
+				[
+					{
+						"node": "Did they answer?",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Did they answer?": {
+			"main": [
+				[
+					{
+						"node": "Re-read entry",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "No answer in time",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Re-read entry": {
+			"main": [
+				[
+					{
+						"node": "Still actionable?",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Still actionable?": {
+			"main": [
+				[
+					{
+						"node": "Approved?",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Changed while waiting",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Approved?": {
+			"main": [
+				[
+					{
+						"node": "Approve in Inistate",
+						"type": "main",
+						"index": 0
+					}
+				],
+				[
+					{
+						"node": "Reject in Inistate",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"active": false,
+	"settings": {
+		"executionOrder": "v1"
+	},
+	"versionId": "6737822f-c940-4c69-a3d6-a838d10cbe79",
+	"meta": {
+		"templateCredsSetupCompleted": false
+	},
+	"tags": []
+}

@@ -1,0 +1,225 @@
+{
+	"name": "Daily digest of stale Inistate approvals",
+	"nodes": [
+		{
+			"parameters": {
+				"content": "## Daily digest of stale Inistate approvals\nEvery morning, emails a list of entries that have sat in your approval state for too long. No email is sent when nothing is stale.\n\n**Setup**\n1. In **Find stale entries** pick the workspace, module, and an Inistate credential.\n2. **Listing:** *Everything* works only for workspace admins. For any other account, pick a listing that account can open.\n3. In **Settings**, set the approval **state name** exactly as in Inistate, how many days counts as stale, and the recipients.\n4. Add an SMTP credential to **Send digest**.",
+				"width": 560,
+				"height": 360
+			},
+			"type": "n8n-nodes-base.stickyNote",
+			"typeVersion": 1,
+			"position": [-460, -400],
+			"name": "Setup",
+			"id": "cb24c8c2-f5ad-49e5-abfb-473807e50bdd"
+		},
+		{
+			"parameters": {
+				"rule": {
+					"interval": [
+						{
+							"triggerAtHour": 9
+						}
+					]
+				}
+			},
+			"type": "n8n-nodes-base.scheduleTrigger",
+			"typeVersion": 1.2,
+			"position": [-400, 0],
+			"name": "Every morning",
+			"id": "030537fa-0f38-4d7f-a25e-129842d1203c"
+		},
+		{
+			"parameters": {
+				"mode": "manual",
+				"assignments": {
+					"assignments": [
+						{
+							"id": "e0ee7e61-bd55-430c-a923-3d1e74b53840",
+							"name": "pendingState",
+							"value": "Pending Approval",
+							"type": "string"
+						},
+						{
+							"id": "b828db62-7c02-4a5b-a03f-1d6f71e96ae0",
+							"name": "staleDays",
+							"value": 3,
+							"type": "number"
+						},
+						{
+							"id": "349692b0-9db5-4a90-a33f-29d66469c13b",
+							"name": "digestTo",
+							"value": "team@example.com",
+							"type": "string"
+						},
+						{
+							"id": "ef5e8426-e6cf-4131-a5e1-4f38a7463ed4",
+							"name": "fromEmail",
+							"value": "n8n@example.com",
+							"type": "string"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [-180, 0],
+			"name": "Settings",
+			"id": "d51a581f-56a5-4670-a6ae-07d638c62a74"
+		},
+		{
+			"parameters": {
+				"resource": "entry",
+				"workspaceId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"moduleId": {
+					"__rl": true,
+					"value": "",
+					"mode": "list"
+				},
+				"operation": "getAll",
+				"listing": "",
+				"returnAll": true,
+				"options": {
+					"state": "={{ $('Settings').item.json.pendingState }}",
+					"updatedBefore": "={{ $now.minus($('Settings').item.json.staleDays, 'days').toISO() }}",
+					"fields": "state,updatedDate,updatedBy,assignees",
+					"sortDirection": "asc"
+				}
+			},
+			"type": "n8n-nodes-inistate.inistate",
+			"typeVersion": 1,
+			"position": [40, 0],
+			"name": "Find stale entries",
+			"id": "f5f9c5ff-4b92-47cf-aabe-8a6bf7a4064b"
+		},
+		{
+			"parameters": {
+				"aggregate": "aggregateAllItemData",
+				"destinationFieldName": "entries",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.aggregate",
+			"typeVersion": 1,
+			"position": [260, 0],
+			"name": "Collect entries",
+			"id": "4d940a00-8c04-4d50-a177-c1f7bbcb8127"
+		},
+		{
+			"parameters": {
+				"mode": "manual",
+				"assignments": {
+					"assignments": [
+						{
+							"id": "04543673-cb82-46b3-a2ad-23d4ec604176",
+							"name": "subject",
+							"value": "={{ $json.entries.length + ' entries waiting over ' + $('Settings').item.json.staleDays + ' days for approval' }}",
+							"type": "string"
+						},
+						{
+							"id": "6a913b28-de03-4646-a323-70d2e9873bc0",
+							"name": "html",
+							"value": "={{ '<p>These entries have been in <b>' + String($('Settings').item.json.pendingState ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + '</b> for more than ' + $('Settings').item.json.staleDays + ' days:</p><table cellpadding=\"6\" style=\"border-collapse:collapse\"><tr><th align=\"left\">Entry</th><th align=\"left\">Last updated</th><th align=\"left\">By</th><th align=\"left\">Assigned to</th></tr>' + $json.entries.map(e => '<tr><td>' + String(e.documentId ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + '</td><td>' + String((e.updatedDate ? DateTime.fromISO(e.updatedDate).toRelative() : '') ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + '</td><td>' + String(e.updatedBy ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + '</td><td>' + String((e.assignees ?? []).join(', ') ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]) + '</td></tr>').join('') + '</table>' }}",
+							"type": "string"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.set",
+			"typeVersion": 3.4,
+			"position": [480, 0],
+			"name": "Build digest",
+			"id": "69010635-8ceb-40c3-a46e-630e66f29a73"
+		},
+		{
+			"parameters": {
+				"resource": "email",
+				"operation": "send",
+				"fromEmail": "={{ $('Settings').item.json.fromEmail }}",
+				"toEmail": "={{ $('Settings').item.json.digestTo }}",
+				"subject": "={{ $json.subject }}",
+				"emailFormat": "html",
+				"html": "={{ $json.html }}",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.emailSend",
+			"typeVersion": 2.1,
+			"position": [700, 0],
+			"name": "Send digest",
+			"webhookId": "c2fb8944-8d66-4590-ac3f-ecb798bc3355",
+			"id": "4ba8d534-1546-499e-abb1-09952f911995"
+		}
+	],
+	"pinData": {},
+	"connections": {
+		"Every morning": {
+			"main": [
+				[
+					{
+						"node": "Settings",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Settings": {
+			"main": [
+				[
+					{
+						"node": "Find stale entries",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Find stale entries": {
+			"main": [
+				[
+					{
+						"node": "Collect entries",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Collect entries": {
+			"main": [
+				[
+					{
+						"node": "Build digest",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Build digest": {
+			"main": [
+				[
+					{
+						"node": "Send digest",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"active": false,
+	"settings": {
+		"executionOrder": "v1"
+	},
+	"versionId": "a8ad041e-0462-40ec-a813-fd5efbcc0bf7",
+	"meta": {
+		"templateCredsSetupCompleted": false
+	},
+	"tags": []
+}
