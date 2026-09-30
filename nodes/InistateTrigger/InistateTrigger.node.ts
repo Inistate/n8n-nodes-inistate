@@ -42,12 +42,6 @@ export class InistateTrigger implements INodeType {
 		],
 		properties: [
 			{
-				displayName: 'The API environment is selected in the Inistate credential.',
-				name: 'environmentNotice',
-				type: 'notice',
-				default: '',
-			},
-			{
 				displayName: 'Trigger On',
 				name: 'event',
 				type: 'options',

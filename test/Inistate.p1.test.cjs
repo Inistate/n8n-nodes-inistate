@@ -33,7 +33,7 @@ function createActionContext(operation, responder, module = modules[0]) {
 	return {
 		requests,
 		context: {
-			getCredentials: async () => ({ environment: 'production' }),
+			getCredentials: async () => ({ baseUrl: '' }),
 			getInputData: () => [{ json: {} }],
 			getNodeParameter(name, _itemIndex, fallback, options) {
 				return extractParameter(parameters[name] ?? fallback, options);
@@ -69,7 +69,7 @@ function createStateHookContext({
 		requests,
 		staticData,
 		context: {
-			getCredentials: async () => ({ environment: 'production' }),
+			getCredentials: async () => ({ baseUrl: '' }),
 			getWorkflowStaticData: () => staticData,
 			getNodeWebhookUrl: () => 'https://n8n.example/webhook/inistate',
 			getNodeParameter(name, fallback, options) {
@@ -127,7 +127,7 @@ test('reports P1 API failures as NodeApiError with recovery guidance', async () 
 	await assert.rejects(new Inistate().execute.call(context), (error) => {
 		assert.equal(error.constructor.name, 'NodeApiError');
 		assert.equal(error.httpCode, '404');
-		assert.match(error.description, /credential.*environment.*workspace.*module.*try again/i);
+		assert.match(error.description, /credential.*workspace.*module.*try again/i);
 		return true;
 	});
 });

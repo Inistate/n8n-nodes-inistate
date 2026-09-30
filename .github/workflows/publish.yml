@@ -1,12 +1,25 @@
 # Publishes a tagged release from GitHub with npm provenance.
 #
-# One-time npm setup:
+# FIRST PUBLISH (package does not exist on npm yet):
+# npm trusted publishing cannot bootstrap a new package -- the trusted publisher
+# record lives on the package settings page, which only exists after v1 is up.
+# So the first release authenticates with a token:
+# 1. npmjs.com -> Access Tokens -> Generate -> Granular access token.
+#      Permissions: Packages and scopes = "Read and write"
+#      Select packages: "All packages" (you cannot scope to a package that
+#      does not exist yet). Set a short expiry.
+# 2. Add it as the repo secret NPM_TOKEN.
+# 3. Run this workflow (tag push, or Actions -> Publish -> Run workflow).
+#
+# AFTER THE FIRST PUBLISH (switch to OIDC, no long-lived token):
 # 1. Open the n8n-nodes-inistate package settings on npmjs.com.
 # 2. Add a GitHub Actions trusted publisher for:
 #      owner: Inistate
 #      repository: n8n-nodes-inistate
 #      workflow: publish.yml
-# 3. Leave the environment blank and do not add NPM_TOKEN when using OIDC.
+#    Leave the environment blank.
+# 3. Revoke the npm token, delete the NPM_TOKEN secret, and drop the
+#    NODE_AUTH_TOKEN env block from the publish step below.
 
 name: Publish
 
@@ -14,6 +27,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -41,3 +55,5 @@ jobs:
 
       - name: Publish with provenance
         run: npm run release
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

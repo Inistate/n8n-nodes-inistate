@@ -2,16 +2,14 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
-	APP02_BASE_URL,
 	INISTATE_BASE_URL,
 	buildAutomationHeaders,
 	buildEntryCreatedSubscription,
 	getWebhookId,
 } = require('../dist/nodes/InistateTrigger/InistateTrigger.contract.js');
 
-test('defines the supported Production and App02 API URLs', () => {
+test('defines the default Production API URL', () => {
 	assert.equal(INISTATE_BASE_URL, 'https://api.inistate.com');
-	assert.equal(APP02_BASE_URL, 'https://app02.apps.inistate.com');
 });
 
 test('builds n8n automation headers', () => {

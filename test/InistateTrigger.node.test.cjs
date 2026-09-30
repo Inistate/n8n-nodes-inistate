@@ -23,7 +23,7 @@ function createHookContext(
 
 	return {
 		getCredentials: async () => ({
-			environment: 'production',
+			baseUrl: '',
 			username: 'tester@inistate.com',
 		}),
 		getWorkflowStaticData: () => staticData,

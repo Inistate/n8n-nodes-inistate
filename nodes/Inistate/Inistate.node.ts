@@ -32,12 +32,6 @@ export class Inistate implements INodeType {
 		credentials: [{ name: 'inistateApi', required: true }],
 		properties: [
 			{
-				displayName: 'The API environment is selected in the Inistate credential.',
-				name: 'environmentNotice',
-				type: 'notice',
-				default: '',
-			},
-			{
 				displayName: 'Resource',
 				name: 'resource',
 				type: 'options',

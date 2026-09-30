@@ -54,7 +54,7 @@ runtime, credential guide, and example workflow included
 
 | Requirement                                          | Status    | Evidence or blocker                                                                           |
 | ---------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------- |
-| Production/App02 host selection                      | Confirmed | Automated routing passes; Production profile and live module requests succeeded               |
+| API host selection                                   | Confirmed | Automated routing passes; Production profile and live module requests succeeded               |
 | `GET /api/profile` with intended key                 | Confirmed | Production returned success in live run `N8N-TEST-20260825090337`                             |
 | Dedicated sandbox                                    | Confirmed | `N8N Production Sandbox`; modules `Task Tracker`, `Projects`, and `Members`                   |
 | Workspace and module IDs                             | Confirmed | Workspace `12661`; modules `53677`, `53678`, and `53679`, resolved by exact name              |
@@ -70,7 +70,7 @@ runtime, credential guide, and example workflow included
 | Nested section/tab and unsupported live cases        | Pending   | Covered synthetically; production form coverage is not yet recorded                           |
 | Two distinct assignable users                        | Pending   | Not yet evidenced                                                                             |
 
-The retired App02 workspace/module IDs (`2307`, `19296`, and `19305`) must not be used for this
+The retired internal workspace/module IDs (`2307`, `19296`, and `19305`) must not be used for this
 production sandbox. The live harness resolves current IDs from exact names.
 
 ## Tooling, package, and security

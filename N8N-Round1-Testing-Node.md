@@ -2,7 +2,7 @@
 
 Recorded: 2026-08-24 (Asia/Singapore)
 
-These findings were recorded after the first local and App02 testing round. They are observations
+These findings were recorded after the first local and internal API testing round. They are observations
 and follow-up decisions, not confirmation that release readiness is complete.
 
 ## 1. Entry identifier input
@@ -15,7 +15,7 @@ Potential improvement:
 
 - Provide an Entry resource locator with **From List** and **By Document ID** modes.
 - Display the entry title and document ID in list results while returning the document ID.
-- Add **By Internal Entry ID** only after App02 confirms that `/api/activity/` accepts an internal
+- Add **By Internal Entry ID** only after the internal API confirms that `/api/activity/` accepts an internal
   numeric ID, or after a reliable internal-ID-to-document-ID lookup is implemented.
 
 The existing Zapier integration also requests the document ID rather than the internal entry ID.
@@ -36,10 +36,10 @@ Useful local messages currently exist for:
 
 Gaps:
 
-- App02 messages are largely passed through, so vague server messages remain vague.
+- Internal API messages are largely passed through, so vague server messages remain vague.
 - Continue On Fail currently retains only `error.message`.
 - Not every validation branch has a direct automated test.
-- Required dynamic-field errors still depend partly on n8n and App02 validation.
+- Required dynamic-field errors still depend partly on n8n and internal API validation.
 
 Recommended follow-up: add operation-specific error context without exposing credentials or sensitive
 payload data.
@@ -83,7 +83,7 @@ Entry Updated and Activity Performed triggers are currently module-wide:
 - Neither registration contains an entry ID or document ID.
 
 This matches the existing Zapier integration. An n8n IF node can filter the delivered payload by
-`header.documentId`. An optional Document ID filter could be added to the trigger, but App02 would
+`header.documentId`. An optional Document ID filter could be added to the trigger, but the internal API would
 still deliver all matching module events unless its hook API supports server-side entry filtering.
 
 ## 6. Self-trigger loop risk
@@ -98,11 +98,11 @@ Safe workflow patterns include:
 - Set and check a `Processed By n8n` marker.
 - Filter by document ID before updating.
 - Use event-source or updater filtering only if live callback evidence proves those fields are stable.
-- Reject recently processed event IDs if App02 provides a stable unique event identifier.
+- Reject recently processed event IDs if the internal API provides a stable unique event identifier.
 
 Recommended product follow-up:
 
 - Add an optional Document ID filter to Entry Updated and Activity Performed.
 - Add a visible self-trigger-loop warning to Entry Updated.
-- Add an automatic “ignore n8n-generated events” option only if App02 reliably delivers an origin
+- Add an automatic “ignore n8n-generated events” option only if the internal API reliably delivers an origin
   identifier such as the activity medium or another source field.
