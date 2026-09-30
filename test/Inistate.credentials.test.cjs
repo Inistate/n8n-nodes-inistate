@@ -185,7 +185,14 @@ test('translates OAuth2 activity requests to the v1 contract', async () => {
 			activityId: 'edit',
 			moduleId: '42',
 			entry: 'REQ 00001',
-			payload: { Title: 'Updated' },
+			payload: {
+				Title: 'Updated',
+				'Parent Request': 'REQ 00002',
+				'Parent RequestId': 1002,
+				Owner: 'Alice Lee',
+				OwnerId: 17,
+				OwnerUsername: 'alice.lee@example.com',
+			},
 		},
 	});
 
@@ -202,7 +209,11 @@ test('translates OAuth2 activity requests to the v1 contract', async () => {
 		module: 'Requests',
 		activity: 'edit',
 		entryId: 1001,
-		input: { Title: 'Updated' },
+		input: {
+			Title: 'Updated',
+			'Parent Request': { value: 'REQ 00002', id: 1002 },
+			Owner: { value: 'Alice Lee', id: 17, username: 'alice.lee@example.com' },
+		},
 	});
 });
 

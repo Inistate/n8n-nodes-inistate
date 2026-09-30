@@ -47,6 +47,40 @@ function numericEntryId(value: unknown): number {
 	return entryId;
 }
 
+function toV1ActivityInput(value: unknown): unknown {
+	if (!isRecord(value)) {
+		return value;
+	}
+
+	const input = { ...value };
+	for (const [key, id] of Object.entries(value)) {
+		if (!key.endsWith('Id') || key.length === 2) {
+			continue;
+		}
+
+		const fieldName = key.slice(0, -2);
+		const fieldValue = value[fieldName];
+		if (
+			fieldValue === undefined ||
+			(typeof id !== 'string' && typeof id !== 'number')
+		) {
+			continue;
+		}
+
+		const usernameKey = `${fieldName}Username`;
+		const username = value[usernameKey];
+		input[fieldName] = {
+			value: fieldValue,
+			id,
+			...(typeof username === 'string' ? { username } : {}),
+		};
+		delete input[key];
+		delete input[usernameKey];
+	}
+
+	return input;
+}
+
 export class InistateOAuthAdapter implements InistateRequestAdapter {
 	constructor(
 		private readonly context: InistateRequestFunctions,
@@ -213,6 +247,7 @@ export class InistateOAuthAdapter implements InistateRequestAdapter {
 				['due', 'due'],
 				['comment', 'comment'],
 			]);
+			v1Body.input = toV1ActivityInput(v1Body.input);
 			return { ...options, url: '/v1/activity', body: v1Body };
 		}
 

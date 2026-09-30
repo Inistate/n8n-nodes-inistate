@@ -315,6 +315,86 @@ test('resolves current reference data at execution and sends display values with
 	);
 });
 
+test('uses an encoded OAuth reference selection without reloading the reference module', async () => {
+	const node = new Inistate();
+	const requests = [];
+	const parameters = {
+		authentication: 'oAuth2',
+		operation: 'create',
+		workspaceId: { mode: 'id', value: '9001' },
+		moduleId: { mode: 'id', value: '9102' },
+		fields: {
+			mappingMode: 'defineBelow',
+			value: {
+				'Reported By':
+					'__inistate_reference__:{"id":10191799,"name":"bingqian","username":"bingqian.lee@inistate.com"}',
+				Problem: 'OAuth reference create test',
+			},
+			matchingColumns: [],
+			schema: [
+				{
+					id: 'Reported By',
+					type: 'options',
+					options: [
+						{
+							name: 'bingqian',
+							value:
+								'__inistate_reference__:{"id":10191799,"name":"bingqian","username":"bingqian.lee@inistate.com"}',
+						},
+					],
+				},
+			],
+			attemptToConvertTypes: false,
+			convertFieldsToString: false,
+		},
+	};
+	const context = {
+		getCredentials: async () => ({ baseUrl: '' }),
+		getInputData: () => [{ json: {} }],
+		getNode: () => ({ name: 'Create entry', parameters }),
+		getNodeParameter(name, _itemIndex, fallback, options) {
+			return extractParameter(parameters[name] ?? fallback, options);
+		},
+		helpers: {
+			async httpRequestWithAuthentication(credentialName, options) {
+				requests.push({ credentialName, options });
+				if (options.url.endsWith('/v1/workspaces/9001')) {
+					return { modules: [{ id: 9102, name: 'Issue' }] };
+				}
+				if (options.url.endsWith('/v1/form')) {
+					return { form: [{ 'Reported By': { type: 'User', module: 'User Profile' } }] };
+				}
+				if (options.url.endsWith('/v1/activity')) {
+					return { header: { documentId: 'ISSUE-0001' } };
+				}
+
+				throw new Error(`Unexpected OAuth execution URL: ${options.url}`);
+			},
+		},
+		continueOnFail: () => false,
+	};
+
+	await node.execute.call(context);
+
+	assert.deepEqual(
+		requests.map(({ options }) => options.url),
+		[
+			'https://api.inistate.com/v1/workspaces/9001',
+			'https://api.inistate.com/v1/form',
+			'https://api.inistate.com/v1/workspaces/9001',
+			'https://api.inistate.com/v1/activity',
+		],
+	);
+	assert.deepEqual(requests[3].options.body.input, {
+		'Reported By': {
+			value: 'bingqian',
+			id: 10191799,
+			username: 'bingqian.lee@inistate.com',
+		},
+		Problem: 'OAuth reference create test',
+	});
+});
+
 test('executes Delete and Duplicate with the Zapier-compatible activity contracts', async () => {
 	const node = new Inistate();
 	const requests = [];
@@ -403,12 +483,13 @@ test('returns a per-item error when Continue On Fail is enabled', async () => {
 	]);
 });
 
-function createLoadContext(parameters, responder, requests) {
+function createLoadContext(parameters, responder, requests, authentication = 'apiKey') {
 	return {
 		getCredentials: async () => ({
 			baseUrl: '',
 			username: 'tester@inistate.com',
 		}),
+		getNode: () => ({ parameters: { authentication } }),
 		getNodeParameter(name, fallback, options) {
 			return extractParameter(parameters[name] ?? fallback, options);
 		},
@@ -676,4 +757,103 @@ test('does not pass an entry document ID when loading custom-activity reference 
 	);
 	assert.equal(selectionRequest.options.body.activityId, 'activity-1');
 	assert.equal(selectionRequest.options.body.documentId, '');
+});
+
+test('loads OAuth user-reference options from the module named by the v1 form', async () => {
+	const requests = [];
+	const context = createLoadContext(
+		{
+			workspaceId: { value: '9001' },
+			moduleId: { value: '9102' },
+			operation: 'create',
+		},
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9102, name: 'Tasks' }] };
+			}
+			if (options.url.endsWith('/v1/form')) {
+				return {
+					form: [
+						{ reportedBy: { type: 'User', module: 'User Profile' } },
+					],
+				};
+			}
+			if (options.url.endsWith('/v1/list')) {
+				return options.body.currentPage === 0
+					? {
+							list: [
+								{
+									entryId: 806569,
+									documentId: 'USER-0001',
+									data: { Name: 'N8N Test User', Username: 'n8n.test.user' },
+								},
+							],
+						}
+					: { list: [] };
+			}
+
+			throw new Error(`Unexpected OAuth test URL: ${options.url}`);
+		},
+		requests,
+		'oAuth2',
+	);
+
+	const result = await resourceMapping.getFormFields.call(context);
+	assert.deepEqual(result.fields[0].options?.map(({ name }) => name), ['N8N Test User']);
+	const selectionRequest = requests.find(({ options }) => options.url.endsWith('/v1/list'));
+	assert.deepEqual(selectionRequest.options.body, {
+		module: 'User Profile',
+		currentPage: 0,
+		pageSize: 500,
+	});
+	assert.ok(requests.every(({ credentialName }) => credentialName === 'inistateOAuth2Api'));
+	assert.ok(requests.every(({ options }) => !options.url.endsWith('/x/select')));
+});
+
+test('loads OAuth module-reference options for a custom activity through v1 list', async () => {
+	const requests = [];
+	const context = createLoadContext(
+		{
+			workspaceId: { value: '9001' },
+			moduleId: { value: '9102' },
+			operation: 'performActivity',
+			activityId: { value: 'Start Task' },
+		},
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9102, name: 'Tasks' }] };
+			}
+			if (options.url.endsWith('/v1/form')) {
+				return {
+					form: [{ project: { type: 'Module', module: 'Projects' } }],
+				};
+			}
+			if (options.url.endsWith('/v1/list')) {
+				return options.body.currentPage === 0
+					? {
+							list: [
+								{
+									entryId: 806568,
+									documentId: 'PROJECT-0001',
+									data: { Name: 'N8N Sandbox Project' },
+								},
+							],
+						}
+					: { list: [] };
+			}
+
+			throw new Error(`Unexpected OAuth test URL: ${options.url}`);
+		},
+		requests,
+		'oAuth2',
+	);
+
+	const result = await resourceMapping.getFormFields.call(context);
+	assert.deepEqual(result.fields[0].options?.map(({ name }) => name), [
+		'N8N Sandbox Project',
+	]);
+	const selectionRequest = requests.find(({ options }) => options.url.endsWith('/v1/list'));
+	assert.equal(selectionRequest.options.body.module, 'Projects');
+	const formRequest = requests.find(({ options }) => options.url.endsWith('/v1/form'));
+	assert.equal(formRequest.options.body.activity, 'Start Task');
 });

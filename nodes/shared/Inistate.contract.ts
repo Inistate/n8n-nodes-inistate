@@ -361,7 +361,12 @@ export function mapFormFields(
 
 		if (mappedType === 'options') {
 			const numericType = typeof element.type === 'number' ? element.type : Number(element.type);
-			field.options = [7, 20].includes(numericType)
+			const normalizedType =
+				typeof element.type === 'string' ? element.type.toLocaleLowerCase() : '';
+			const isReferenceType =
+				[7, 20].includes(numericType) ||
+				['module', 'modules', 'user', 'users'].includes(normalizedType);
+			field.options = isReferenceType
 				? (referenceOptions[id] ?? [])
 				: (Array.isArray(element.options)
 						? element.options
