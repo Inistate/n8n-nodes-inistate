@@ -29,7 +29,10 @@ test('falls back to the production host and normalises a custom base URL', () =>
 		resolveInistateBaseUrl('https://internal.test.example.com//'),
 		'https://internal.test.example.com',
 	);
-	assert.equal(resolveInistateBaseUrl('http://insecure.test.example.com'), 'https://api.inistate.com');
+	assert.equal(
+		resolveInistateBaseUrl('http://insecure.test.example.com'),
+		'https://api.inistate.com',
+	);
 });
 
 test('builds activity headers with the n8n medium and metadata headers without it', () => {
@@ -361,6 +364,9 @@ test('normalizes selector response shapes, filters, and de-duplicates values', (
 		),
 		[{ name: 'N8N Production Sandbox', value: '9001' }],
 	);
+	assert.deepEqual(toSearchItems(['Draft', 'Approved', 'Draft'], ['name'], ['name'], 'app'), [
+		{ name: 'Approved', value: 'Approved' },
+	]);
 });
 
 const nestedFormResponse = {
@@ -489,6 +495,150 @@ test('recursively maps nested sections and tabs while handling read-only and uns
 				required: false,
 				display: false,
 				readOnly: true,
+				options: undefined,
+			},
+		],
+	);
+});
+
+test('maps OAuth v1 form fields into resource-mapper fields', () => {
+	const fields = mapFormFields({
+		module: 'Leave Requests',
+		activity: 'create',
+		fields: [
+			{ name: 'Title', type: 'Text', required: true },
+			{ name: 'Is Urgent', type: 'YesNo' },
+			{ name: 'Days Requested', type: 'Number' },
+			{ name: 'Start Date', type: 'Date' },
+			{
+				name: 'Leave Type',
+				type: 'Selection',
+				options: ['Annual Leave', 'Sick Leave'],
+			},
+			{ name: 'Computed', type: 'Formula', readOnly: true },
+		],
+	});
+
+	assert.deepEqual(
+		fields.map(({ id, displayName, type, required, display, readOnly, options }) => ({
+			id,
+			displayName,
+			type,
+			required,
+			display,
+			readOnly,
+			options,
+		})),
+		[
+			{
+				id: 'Title',
+				displayName: 'Title',
+				type: 'string',
+				required: true,
+				display: true,
+				readOnly: false,
+				options: undefined,
+			},
+			{
+				id: 'Is Urgent',
+				displayName: 'Is Urgent',
+				type: 'boolean',
+				required: false,
+				display: true,
+				readOnly: false,
+				options: undefined,
+			},
+			{
+				id: 'Days Requested',
+				displayName: 'Days Requested',
+				type: 'number',
+				required: false,
+				display: true,
+				readOnly: false,
+				options: undefined,
+			},
+			{
+				id: 'Start Date',
+				displayName: 'Start Date',
+				type: 'dateTime',
+				required: false,
+				display: true,
+				readOnly: false,
+				options: undefined,
+			},
+			{
+				id: 'Leave Type',
+				displayName: 'Leave Type',
+				type: 'options',
+				required: false,
+				display: true,
+				readOnly: false,
+				options: [
+					{ name: 'Annual Leave', value: 'Annual Leave' },
+					{ name: 'Sick Leave', value: 'Sick Leave' },
+				],
+			},
+			{
+				id: 'Computed',
+				displayName: 'Computed',
+				type: 'string',
+				required: false,
+				display: false,
+				readOnly: true,
+				options: undefined,
+			},
+		],
+	);
+});
+
+test('maps the keyed OAuth v1 form response into resource-mapper fields', () => {
+	const fields = mapFormFields({
+		module: 'Leave Requests',
+		activity: 'Approve',
+		form: [
+			{
+				'Leave Type': {
+					type: 'Selection',
+					readOnly: true,
+					options: ['Annual Leave', 'Sick Leave'],
+				},
+			},
+			{ 'Days Requested': { type: 'Number', readOnly: true } },
+			{ Remarks: { type: 'Text', required: true } },
+		],
+	});
+
+	assert.deepEqual(
+		fields.map(({ id, type, required, display, options }) => ({
+			id,
+			type,
+			required,
+			display,
+			options,
+		})),
+		[
+			{
+				id: 'Leave Type',
+				type: 'options',
+				required: false,
+				display: false,
+				options: [
+					{ name: 'Annual Leave', value: 'Annual Leave' },
+					{ name: 'Sick Leave', value: 'Sick Leave' },
+				],
+			},
+			{
+				id: 'Days Requested',
+				type: 'number',
+				required: false,
+				display: false,
+				options: undefined,
+			},
+			{
+				id: 'Remarks',
+				type: 'string',
+				required: true,
+				display: true,
 				options: undefined,
 			},
 		],

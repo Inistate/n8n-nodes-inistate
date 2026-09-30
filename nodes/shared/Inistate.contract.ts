@@ -261,12 +261,18 @@ export function toSearchItems(
 	const results: INodeListSearchItems[] = [];
 
 	for (const value of values) {
-		if (!isRecord(value)) {
+		let itemValue: string | number | boolean | undefined;
+		let itemName: string | number | boolean | undefined;
+		if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+			itemValue = value;
+			itemName = value;
+		} else if (isRecord(value)) {
+			itemValue = firstPrimitive(value, valueKeys);
+			itemName = firstPrimitive(value, nameKeys) ?? itemValue;
+		} else {
 			continue;
 		}
 
-		const itemValue = firstPrimitive(value, valueKeys);
-		const itemName = firstPrimitive(value, nameKeys) ?? itemValue;
 		if (itemValue === undefined || itemName === undefined) {
 			continue;
 		}
@@ -293,7 +299,24 @@ export function toSearchItems(
 }
 
 export function extractFormElements(response: unknown): UnknownRecord[] {
-	if (!isRecord(response) || !isRecord(response.classificationForm)) {
+	if (!isRecord(response)) {
+		return [];
+	}
+	if (Array.isArray(response.fields)) {
+		return response.fields.filter(isRecord);
+	}
+	if (Array.isArray(response.form)) {
+		return response.form.flatMap((item) => {
+			if (!isRecord(item)) {
+				return [];
+			}
+
+			return Object.entries(item).flatMap(([name, definition]) =>
+				isRecord(definition) ? [{ ...definition, name }] : [],
+			);
+		});
+	}
+	if (!isRecord(response.classificationForm)) {
 		return [];
 	}
 
@@ -310,10 +333,9 @@ export function mapFormFields(
 	const seen = new Set<string>();
 
 	for (const element of extractFormElements(response)) {
-		const idValue = firstPrimitive(element, ['fieldName']);
-		const displayNameValue = firstPrimitive(element, ['displayName', 'fieldName']);
-		const numericType = typeof element.type === 'number' ? element.type : Number(element.type);
-		const mappedType = mapFieldType(numericType);
+		const idValue = firstPrimitive(element, ['fieldName', 'name']);
+		const displayNameValue = firstPrimitive(element, ['displayName', 'fieldName', 'name']);
+		const mappedType = mapFieldType(element.type);
 
 		if (idValue === undefined || displayNameValue === undefined || !mappedType) {
 			continue;
@@ -338,9 +360,16 @@ export function mapFormFields(
 		};
 
 		if (mappedType === 'options') {
+			const numericType = typeof element.type === 'number' ? element.type : Number(element.type);
 			field.options = [7, 20].includes(numericType)
 				? (referenceOptions[id] ?? [])
-				: extractCollection(element.optionList).flatMap((option) => {
+				: (Array.isArray(element.options)
+						? element.options
+						: extractCollection(element.optionList)
+					).flatMap((option) => {
+						if (typeof option === 'string' || typeof option === 'number') {
+							return [{ name: String(option), value: String(option) }];
+						}
 						if (!isRecord(option)) {
 							return [];
 						}
@@ -623,24 +652,42 @@ function collectDesignElements(value: unknown, elements: UnknownRecord[]): void 
 	}
 }
 
-function mapFieldType(type: number): ResourceMapperField['type'] | undefined {
-	if ([0, 16, 22, 25, 26, 33].includes(type)) {
+function mapFieldType(type: unknown): ResourceMapperField['type'] | undefined {
+	if (typeof type === 'string' && Number.isNaN(Number(type))) {
+		const normalizedType = type.replace(/\(.*\)$/, '').toLocaleLowerCase();
+		if (['yesno'].includes(normalizedType)) {
+			return 'boolean';
+		}
+		if (['integer', 'number', 'currency'].includes(normalizedType)) {
+			return 'number';
+		}
+		if (['date', 'datetime', 'daterange'].includes(normalizedType)) {
+			return 'dateTime';
+		}
+		if (['selection', 'tag', 'user', 'users', 'module', 'modules'].includes(normalizedType)) {
+			return 'options';
+		}
 		return 'string';
 	}
 
-	if (type === 1) {
+	const numericType = typeof type === 'number' ? type : Number(type);
+	if ([0, 16, 22, 25, 26, 33].includes(numericType)) {
+		return 'string';
+	}
+
+	if (numericType === 1) {
 		return 'boolean';
 	}
 
-	if ([2, 3, 4].includes(type)) {
+	if ([2, 3, 4].includes(numericType)) {
 		return 'number';
 	}
 
-	if ([5, 6].includes(type)) {
+	if ([5, 6].includes(numericType)) {
 		return 'dateTime';
 	}
 
-	if ([7, 20, 27].includes(type)) {
+	if ([7, 20, 27].includes(numericType)) {
 		return 'options';
 	}
 

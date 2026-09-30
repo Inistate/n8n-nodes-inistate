@@ -1,8 +1,5 @@
 import type {
-	IAllExecuteFunctions,
 	IDataObject,
-	IExecuteFunctions,
-	IHookFunctions,
 	IHttpRequestOptions,
 	ILoadOptionsFunctions,
 	INodeListSearchItems,
@@ -21,31 +18,31 @@ import {
 	getFormDefaultValues,
 	getMappedFieldValues,
 	mapFormFields,
-	resolveInistateBaseUrl,
 	toReferenceFieldOptions,
 	toFieldSearchItems,
 	toSearchItems,
 } from './Inistate.contract';
-
-type InistateRequestFunctions = IExecuteFunctions | IHookFunctions | ILoadOptionsFunctions;
+import {
+	createInistateRequestAdapter,
+	findEntryByIdentifier,
+	isRecord,
+	nestedCollection,
+	type InistateRequestConfig,
+	type InistateRequestFunctions,
+	usesOAuth,
+	workspaceModules,
+	workspaceModuleStates,
+} from './api';
 
 export async function inistateApiRequest(
 	context: InistateRequestFunctions,
 	options: IHttpRequestOptions,
+	requestConfig: InistateRequestConfig = {},
 ): Promise<unknown> {
-	const credentials = await context.getCredentials('inistateApi');
-	const baseUrl = resolveInistateBaseUrl(credentials.baseUrl);
+	const adapter = await createInistateRequestAdapter(context);
 
 	try {
-		return await context.helpers.httpRequestWithAuthentication.call(
-			context as IAllExecuteFunctions,
-			'inistateApi',
-			{
-				...options,
-				url: options.url.startsWith('http') ? options.url : `${baseUrl}${options.url}`,
-				json: true,
-			},
-		);
+		return await adapter.request(options, requestConfig);
 	} catch (error) {
 		throw new NodeApiError(context.getNode(), error as JsonObject, {
 			description:
@@ -80,6 +77,16 @@ async function getModuleStates(
 	workspaceId: string,
 	moduleId: string,
 ): Promise<unknown[]> {
+	if (usesOAuth(context)) {
+		const response = await inistateApiRequest(context, {
+			method: 'POST',
+			url: '/api/Workspace/Module',
+			headers: buildApiHeaders(workspaceId, false),
+			body: { moduleId },
+		});
+		return nestedCollection(response, 'states');
+	}
+
 	const response = await getWorkspaceDetails(context, workspaceId);
 	return extractCollection(response, 'states').filter((state) => {
 		if (typeof state !== 'object' || state === null || Array.isArray(state)) {
@@ -337,6 +344,29 @@ export async function getCurrentEntryFields(
 	moduleId: string,
 	documentId: string,
 ): Promise<IDataObject> {
+	if (usesOAuth(context)) {
+		const listResponse = await inistateApiRequest(context, {
+			method: 'POST',
+			url: '/api/workspace/list',
+			headers: buildApiHeaders(workspaceId, false),
+			body: {
+				moduleId,
+				currentPage: 0,
+				pageSize: 10,
+				search: documentId,
+			},
+		});
+		const entry = findEntryByIdentifier(listResponse, documentId);
+		if (!entry) {
+			throw new Error(`No accessible entry was found with document ID "${documentId}"`);
+		}
+		if (!isRecord(entry.data)) {
+			throw new Error('Inistate did not return the current editable field values');
+		}
+
+		return { ...entry.data } as IDataObject;
+	}
+
 	const workspace = await getWorkspaceDetails(context, workspaceId);
 	const targetModule = extractCollection(workspace, 'vectors').find(
 		(value) =>
@@ -434,7 +464,7 @@ export const listSearch = {
 		const workspaceId = getSelectedValue(this, 'workspaceId');
 		const response = await getWorkspaceDetails(this, workspaceId);
 		return {
-			results: toSearchItems(extractCollection(response, 'vectors'), ['id'], ['name'], filter),
+			results: toSearchItems(workspaceModules(response), ['id'], ['name'], filter),
 		};
 	},
 
@@ -454,8 +484,65 @@ export const listSearch = {
 			headers: buildApiHeaders(workspaceId, false),
 			body: { moduleId },
 		});
+		const activities = nestedCollection(response, 'activities').filter((activity) => {
+			const name = typeof activity === 'string'
+				? activity
+				: isRecord(activity) && typeof activity.name === 'string'
+					? activity.name
+					: '';
+			return !['create', 'edit'].includes(name.trim().toLocaleLowerCase());
+		});
 		return {
-			results: toSearchItems(extractCollection(response, 'activities'), ['id'], ['name'], filter),
+			results: usesOAuth(this)
+				? toSearchItems(activities, ['name'], ['name'], filter)
+				: toSearchItems(activities, ['id'], ['name'], filter),
+		};
+	},
+
+	async searchTriggerActivities(
+		this: ILoadOptionsFunctions,
+		filter?: string,
+	): Promise<INodeListSearchResult> {
+		const workspaceId = getSelectedValue(this, 'workspaceId');
+		const moduleId = getSelectedValue(this, 'moduleId');
+		if (!workspaceId || !moduleId) {
+			return { results: [] };
+		}
+
+		if (usesOAuth(this)) {
+			const workspace = await getWorkspaceDetails(this, workspaceId);
+			const module = workspaceModules(workspace).find(
+				(candidate) => isRecord(candidate) && String(candidate.id) === moduleId,
+			);
+			const moduleName = isRecord(module) && typeof module.name === 'string'
+				? module.name.trim()
+				: '';
+			if (!moduleName) {
+				return { results: [] };
+			}
+
+			const response = await inistateApiRequest(this, {
+				method: 'GET',
+				url: `/api/configure/${encodeURIComponent(moduleName)}`,
+				headers: buildApiHeaders(workspaceId, false),
+			});
+			return {
+				results: toSearchItems(nestedCollection(response, 'activities'), ['id'], ['name'], filter),
+			};
+		}
+
+		const response = await inistateApiRequest(
+			this,
+			{
+				method: 'POST',
+				url: '/api/Workspace/Module',
+				headers: buildApiHeaders(workspaceId, false),
+				body: { moduleId },
+			},
+			{ preserveLegacyPath: true },
+		);
+		return {
+			results: toSearchItems(nestedCollection(response, 'activities'), ['id'], ['name'], filter),
 		};
 	},
 
@@ -499,9 +586,29 @@ export const listSearch = {
 		return { results: toSearchItems(states, ['id'], ['name'], filter) };
 	},
 
+	async searchTriggerStateIds(
+		this: ILoadOptionsFunctions,
+		filter?: string,
+	): Promise<INodeListSearchResult> {
+		const workspaceId = getSelectedValue(this, 'workspaceId');
+		const moduleId = getSelectedValue(this, 'moduleId');
+		if (!workspaceId || !moduleId) {
+			return { results: [] };
+		}
+
+		const response = await getWorkspaceDetails(this, workspaceId);
+		const states = workspaceModuleStates(response, moduleId);
+		return { results: toSearchItems(states, ['id'], ['name'], filter) };
+	},
+
 	async searchUsers(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
 		const workspaceId = getSelectedValue(this, 'workspaceId');
-		const response = await getWorkspaceDetails(this, workspaceId);
+		const response = usesOAuth(this)
+			? await inistateApiRequest(this, {
+					method: 'GET',
+					url: `/v1/workspaces/${encodeURIComponent(workspaceId)}/users`,
+				})
+			: await getWorkspaceDetails(this, workspaceId);
 		return {
 			results: toSearchItems(
 				extractCollection(response, 'users'),

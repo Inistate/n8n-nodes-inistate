@@ -7,7 +7,12 @@ import {
 	getResponsePage,
 	MCP_HISTORY_URL,
 } from '../../../shared/InistateRead.contract';
-import { entryIdProperty, limitProperty, returnAllProperty } from './properties';
+import {
+	entryIdentifierTypeProperty,
+	entryIdProperty,
+	limitProperty,
+	returnAllProperty,
+} from './properties';
 import type { EntryReadActionDefinition } from './types';
 
 export const getHistoryAction: EntryReadActionDefinition = {
@@ -20,6 +25,7 @@ export const getHistoryAction: EntryReadActionDefinition = {
 			'Retrieve the audit trail of an entry: every activity performed, every state change, and every comment, by humans and AI alike',
 	},
 	properties: [
+		entryIdentifierTypeProperty('getHistory'),
 		entryIdProperty('getHistory'),
 		returnAllProperty('getHistory'),
 		limitProperty('getHistory'),
@@ -30,18 +36,27 @@ export const getHistoryAction: EntryReadActionDefinition = {
 			? Number.POSITIVE_INFINITY
 			: (this.getNodeParameter('limit', itemIndex, 50) as number);
 		const entryId = this.getNodeParameter('entryId', itemIndex);
+		const entryIdentifierType = this.getNodeParameter(
+			'entryIdentifierType',
+			itemIndex,
+			'documentId',
+		) as 'documentId' | 'entryId';
 		const headers = buildApiHeaders(workspaceId, false);
 		const histories: IDataObject[] = [];
 
 		// The endpoint pages at a fixed server-side size, so a limit is applied after the
 		// fact rather than pushed down into the request.
 		for (let page = 0; ; page++) {
-			const response = await inistateApiRequest(this, {
-				method: 'POST',
-				url: MCP_HISTORY_URL,
-				headers,
-				body: buildHistoryBody(moduleId, entryId, page),
-			});
+			const response = await inistateApiRequest(
+				this,
+				{
+					method: 'POST',
+					url: MCP_HISTORY_URL,
+					headers,
+					body: buildHistoryBody(moduleId, entryId, page),
+				},
+				{ entryIdentifierType },
+			);
 			const { items, hasMore } = getResponsePage(response, 'histories');
 			histories.push(...items);
 

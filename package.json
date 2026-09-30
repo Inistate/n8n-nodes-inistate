@@ -38,7 +38,8 @@
 		"n8nNodesApiVersion": 1,
 		"strict": true,
 		"credentials": [
-			"dist/credentials/InistateApi.credentials.js"
+			"dist/credentials/InistateApi.credentials.js",
+			"dist/credentials/InistateOAuth2Api.credentials.js"
 		],
 		"nodes": [
 			"dist/nodes/Inistate/Inistate.node.js",

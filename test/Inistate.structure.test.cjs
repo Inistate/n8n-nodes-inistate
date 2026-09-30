@@ -3,6 +3,7 @@ const test = require('node:test');
 
 const { Inistate } = require('../dist/nodes/Inistate/Inistate.node.js');
 const { InistateApi } = require('../dist/credentials/InistateApi.credentials.js');
+const { InistateOAuth2Api } = require('../dist/credentials/InistateOAuth2Api.credentials.js');
 const { assignEntryAction } = require('../dist/nodes/Inistate/actions/entry/assign.operation.js');
 const {
 	changeStateAction,
@@ -99,10 +100,10 @@ test('advertises exactly the eleven action modules registered by the action node
 		create: ['fields'],
 		delete: ['deleteWarning', 'documentId'],
 		duplicate: ['documentId'],
-		get: ['entryId'],
+		get: ['entryIdentifierType', 'entryId'],
 		getAll: ['listing', 'returnAll', 'limit', 'options'],
-		getForm: ['formActivity', 'formEntryId'],
-		getHistory: ['entryId', 'returnAll', 'limit'],
+		getForm: ['formActivity', 'entryIdentifierType', 'formEntryId'],
+		getHistory: ['entryIdentifierType', 'entryId', 'returnAll', 'limit'],
 		performActivity: ['documentId', 'activityId', 'fields'],
 		update: ['documentId', 'fields'],
 	};
@@ -112,6 +113,20 @@ test('advertises exactly the eleven action modules registered by the action node
 			.map(({ name }) => name);
 		assert.deepEqual(visibleNames, expectedNames);
 		assert.equal(new Set(visibleNames).size, visibleNames.length);
+	}
+
+	const identifierTypeProperties = new Inistate().description.properties.filter(
+		(property) => property.name === 'entryIdentifierType',
+	);
+	assert.equal(identifierTypeProperties.length, 3);
+	for (const property of identifierTypeProperties) {
+		assert.deepEqual(
+			property.options.map(({ name, value }) => ({ name, value })),
+			[
+				{ name: 'Document ID', value: 'documentId' },
+				{ name: 'Entry ID', value: 'entryId' },
+			],
+		);
 	}
 });
 
@@ -144,6 +159,11 @@ test('advertises exactly the four event modules registered by the trigger node',
 			.map(({ name }) => name),
 		['stateChangeDirection', 'stateId'],
 	);
+	const triggerProperties = new InistateTrigger().description.properties;
+	const activityId = triggerProperties.find((property) => property.name === 'activityId');
+	const stateId = triggerProperties.find((property) => property.name === 'stateId');
+	assert.equal(activityId.modes[0].typeOptions.searchListMethod, 'searchTriggerActivities');
+	assert.equal(stateId.modes[0].typeOptions.searchListMethod, 'searchTriggerStateIds');
 });
 
 test('keeps bounded mutation output tool-friendly without a Simplify toggle', () => {
@@ -156,11 +176,29 @@ test('keeps bounded mutation output tool-friendly without a Simplify toggle', ()
 	assert.match(deleteEntryAction.option.description, /cannot be undone/i);
 });
 
+test('offers API key and OAuth2 authentication on both nodes', () => {
+	for (const node of [new Inistate(), new InistateTrigger()]) {
+		const authentication = node.description.properties.find(
+			(property) => property.name === 'authentication',
+		);
+		assert.deepEqual(
+			authentication.options.map(({ value }) => value),
+			['apiKey', 'oAuth2'],
+		);
+		assert.equal(authentication.default, 'apiKey');
+		assert.deepEqual(
+			node.description.credentials.map(({ name }) => name),
+			['inistateApi', 'inistateOAuth2Api'],
+		);
+	}
+});
+
 test('prefixes example placeholders with e.g.', () => {
 	const definitions = [
 		new Inistate().description,
 		new InistateTrigger().description,
 		{ properties: new InistateApi().properties },
+		{ properties: new InistateOAuth2Api().properties },
 	];
 	const placeholders = [];
 

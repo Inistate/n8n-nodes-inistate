@@ -4,9 +4,8 @@ This is an n8n community node package for connecting workflows to
 [Inistate](https://www.inistate.com/). It can read, create, and manage Inistate entries and start
 n8n workflows when supported Inistate events occur.
 
-> **Availability:** Version `0.1.0` is a release candidate and is not yet published on npm. The
-> package is currently intended for evaluation from source. Normal self-hosted installation will
-> be available after npm publication; n8n Cloud installation requires n8n verification.
+> **Availability:** The package is available on npm for self-hosted n8n installations. Installation
+> through n8n Cloud requires n8n verification.
 
 ## Installation
 
@@ -128,7 +127,23 @@ instance or a controlled HTTPS tunnel when evaluating triggers locally.
 
 ## Credentials
 
-You need an Inistate account and API key:
+The action and trigger nodes support an Inistate API key or Inistate OAuth2 connection.
+
+### OAuth2
+
+1. In the Inistate node, set **Authentication** to **OAuth2**.
+2. Create an **Inistate OAuth2 API** credential.
+3. Select **Connect my account** and complete the Inistate consent flow.
+4. Save the credential and test it against a workspace you can access.
+
+OAuth2 uses Inistate's dynamically registered MCP authorization connection and sends the resulting
+bearer token to supported scoped `https://api.inistate.com/v1/...` endpoints. Self-hosted n8n must
+have a public HTTPS editor URL for production OAuth callbacks. Local OAuth testing requires a
+controlled HTTPS tunnel because Inistate currently rejects loopback callback addresses.
+
+### API key
+
+To use an API key:
 
 1. In Inistate, open **Account → Integration**.
 2. Generate or copy an API key.

@@ -12,6 +12,7 @@ function createHookContext(
 	event = 'activityPerformed',
 	stateChangeDirection = 'changeTo',
 	module = modules[0],
+	authentication = 'apiKey',
 ) {
 	const parameters = {
 		workspaceId: { value: workspace.id },
@@ -47,7 +48,7 @@ function createHookContext(
 			type: 'n8n-nodes-inistate.inistateTrigger',
 			typeVersion: 1,
 			position: [0, 0],
-			parameters: {},
+			parameters: { authentication },
 		}),
 	};
 }
@@ -99,6 +100,36 @@ test('registers, recognizes, and removes Activity Performed webhooks for every s
 			},
 		});
 	}
+});
+
+test('uses the OAuth adapter for trigger registration and removal', async () => {
+	const node = new InistateTrigger();
+	const requests = [];
+	const staticData = {};
+	const context = createHookContext(
+		requests,
+		staticData,
+		'activityPerformed',
+		'changeTo',
+		modules[0],
+		'oAuth2',
+	);
+
+	assert.equal(await node.webhookMethods.default.create.call(context), true);
+	assert.equal(await node.webhookMethods.default.delete.call(context), true);
+	assert.deepEqual(
+		requests.map(({ credentialName, options }) => ({ credentialName, url: options.url })),
+		[
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/api/automationHook',
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/api/automationHook/delete/AwVSpu5SvM',
+			},
+		],
+	);
 });
 
 test('registers entry events without reading the hidden Activity property', async () => {

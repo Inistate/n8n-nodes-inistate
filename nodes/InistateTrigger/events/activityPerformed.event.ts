@@ -12,7 +12,7 @@ const activityProperty: INodeProperties = {
 	required: true,
 	description: 'Only callbacks for this activity will be registered',
 	displayOptions: { show: { event: ['activityPerformed'] } },
-	modes: [listMode('searchActivities'), idMode('activity', 'bd438...')],
+	modes: [listMode('searchTriggerActivities'), idMode('activity', 'bd438...')],
 };
 
 export const activityPerformedEvent: TriggerEventDefinition = {

@@ -1,8 +1,54 @@
 # Configure Inistate credentials
 
-The Inistate action and trigger nodes use an **Inistate API** credential. Store the API key only in
-n8n's encrypted credential store; never place it in a workflow parameter, source file, example, or
+The Inistate nodes expose API-key and OAuth2 authentication. Store credentials only in n8n's
+encrypted credential store. Never place them in a workflow parameter, source file, example, or
 ordinary log.
+
+## Connect with OAuth2
+
+1. In the Inistate node, set **Authentication** to **OAuth2**.
+2. Create an **Inistate OAuth2 API** credential.
+3. Select **Connect my account** and complete the Inistate consent flow.
+4. Save the credential and test the node against a workspace you can access.
+
+The first connection attempt registers an OAuth client. If authorization must be retried, turn off
+**Register New OAuth Client** before selecting **Connect** again. n8n will reuse the client ID and
+OAuth URLs saved by the first registration instead of consuming another registration request.
+
+n8n discovers the authorization server from `https://mcp.inistate.com/mcp` and registers the OAuth
+client dynamically. When OAuth2 is selected, the action node translates supported requests to the
+scoped `https://api.inistate.com/v1/...` API. API-key credentials continue to use the existing
+`/api/...` routes.
+
+OAuth2 workspace, module, activity, state, user, form, list, and activity requests use the `/v1`
+API. Trigger registration/removal still uses `/api/automationHook`, because no equivalent `/v1`
+webhook endpoint is currently defined in the supplied backend endpoint list. Reference-field option
+loading also still depends on `/api/activity/formselection`. Those two flows require either bearer
+token support on the legacy routes or corresponding scoped `/v1` backend endpoints.
+
+## OAuth callback URL
+
+n8n Cloud manages its public HTTPS URL automatically. No deployment setting is required.
+
+For self-hosted production, the n8n administrator should configure the instance's public HTTPS
+address once at deployment level:
+
+```text
+N8N_EDITOR_BASE_URL=https://n8n.example.com
+N8N_WEBHOOK_URL=https://n8n.example.com
+```
+
+n8n then generates the OAuth callback URL from that address:
+
+```text
+https://n8n.example.com/rest/oauth2-credential/callback
+```
+
+For local OAuth testing, use a controlled HTTPS tunnel. Set both variables to the tunnel URL and
+open n8n through that same URL before creating or connecting the credential. Do not copy a
+temporary tunnel hostname into source control. Inistate OAuth registration currently rejects
+loopback redirect addresses such as `localhost`, `127.0.0.1`, and `[::1]`; setting a loopback URL
+manually does not bypass that restriction. Local API-key development does not require a tunnel.
 
 ## Prerequisites
 

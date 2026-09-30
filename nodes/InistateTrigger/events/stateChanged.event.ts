@@ -34,7 +34,10 @@ const stateProperty: INodeProperties = {
 	required: true,
 	description: 'The state used by the selected change direction',
 	displayOptions: { show: { event: ['stateChanged'] } },
-	modes: [listMode('searchStateIds'), idMode('state', '8968d341-dc65-4b65-a47c-775633d4c538')],
+	modes: [
+		listMode('searchTriggerStateIds'),
+		idMode('state', '8968d341-dc65-4b65-a47c-775633d4c538'),
+	],
 };
 
 export const stateChangedEvent: TriggerEventDefinition = {

@@ -104,14 +104,31 @@ export function entryIdProperty(
 	required = true,
 ): INodeProperties {
 	return {
-		displayName: 'Entry ID',
+		displayName: 'Entry Identifier',
 		name: 'entryId',
 		type: 'string',
 		default: '',
 		required,
-		placeholder: 'e.g. N8N-TEST00001',
+		placeholder: 'e.g. N8N-TEST00001 or 806548',
 		description:
-			'The document ID (for example N8N-TEST00001) or the numeric entry ID. Trigger payloads carry both in their header.',
+			'The document ID or numeric entry ID, matching the selected identifier type. Trigger payloads carry both in their header.',
+		displayOptions: { show: { operation: [operation] } },
+	};
+}
+
+export function entryIdentifierTypeProperty(
+	operation: Extract<InistateReadOperation, 'get' | 'getForm' | 'getHistory'>,
+): INodeProperties {
+	return {
+		displayName: 'Identifier Type',
+		name: 'entryIdentifierType',
+		type: 'options',
+		options: [
+			{ name: 'Document ID', value: 'documentId' },
+			{ name: 'Entry ID', value: 'entryId' },
+		],
+		default: 'documentId',
+		description: 'Whether the entry is identified by its document ID or numeric entry ID',
 		displayOptions: { show: { operation: [operation] } },
 	};
 }

@@ -21,7 +21,7 @@ function extractParameter(value, options) {
  * `respond` receives every outgoing request and returns the mocked API response, so each
  * test can assert the exact MCP request bodies the node produced.
  */
-function createContext(parameters, respond) {
+function createContext(parameters, respond, authentication = 'apiKey') {
 	const requests = [];
 
 	return {
@@ -49,7 +49,7 @@ function createContext(parameters, respond) {
 			type: 'n8n-nodes-inistate.inistate',
 			typeVersion: 1,
 			position: [0, 0],
-			parameters: {},
+			parameters: { authentication },
 		}),
 	};
 }
@@ -95,6 +95,97 @@ test('Get returns the entry with its state and legal activities intact', async (
 	assert.deepEqual(output, [[{ json: entry, pairedItem: { item: 0 } }]]);
 });
 
+test('Get uses the scoped v1 entry route with the module name for OAuth2', async () => {
+	const entry = {
+		module: 'Task Tracker',
+		entryId: 806548,
+		documentId: 'N8N-TEST00001',
+	};
+	const context = createContext(
+		[{ ...workspaceAndModule, operation: 'get', entryId: 'N8N-TEST00001' }],
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9101, name: 'Task Tracker' }] };
+			}
+			if (options.url.endsWith('/v1/list')) {
+				return { list: [entry] };
+			}
+			return entry;
+		},
+		'oAuth2',
+	);
+
+	const output = await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/workspaces/9001',
+				body: undefined,
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/list',
+				body: {
+					module: 'Task Tracker',
+					search: 'N8N-TEST00001',
+					currentPage: 0,
+					pageSize: 10,
+				},
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/entry',
+				body: { module: 'Task Tracker', entryId: 806548 },
+			},
+		],
+	);
+	assert.deepEqual(output, [[{ json: entry, pairedItem: { item: 0 } }]]);
+});
+
+test('Get sends a selected numeric Entry ID directly to OAuth2 entry', async () => {
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'get',
+				entryIdentifierType: 'entryId',
+				entryId: 806548,
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9101, name: 'Task Tracker' }] };
+			}
+			if (options.url.endsWith('/v1/list')) {
+				throw new Error('A selected Entry ID must not be searched as a document ID');
+			}
+			return { entryId: 806548, documentId: 'N8N-TEST00001' };
+		},
+		'oAuth2',
+	);
+
+	await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/workspaces/9001',
+				body: undefined,
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/entry',
+				body: { module: 'Task Tracker', entryId: 806548 },
+			},
+		],
+	);
+});
+
 test('Get Many stops at the limit and asks for no more than it needs', async () => {
 	const context = createContext(
 		[{ ...workspaceAndModule, operation: 'getAll', returnAll: false, limit: 2 }],
@@ -125,6 +216,53 @@ test('Get Many stops at the limit and asks for no more than it needs', async () 
 		output[0].map(({ pairedItem }) => pairedItem),
 		[{ item: 0 }, { item: 0 }],
 	);
+});
+
+test('Get Many uses the scoped v1 list route with the module name for OAuth2', async () => {
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'getAll',
+				returnAll: false,
+				limit: 2,
+				listing: 'Outstanding Work',
+				options: { search: 'refund' },
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9101, name: 'Task Tracker' }] };
+			}
+			return { hasMore: false, list: [{ entryId: 1, documentId: 'N8N-TEST00001' }] };
+		},
+		'oAuth2',
+	);
+
+	const output = await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/workspaces/9001',
+				body: undefined,
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/list',
+				body: {
+					module: 'Task Tracker',
+					currentPage: 0,
+					pageSize: 2,
+					listing: 'Outstanding Work',
+					search: 'refund',
+				},
+			},
+		],
+	);
+	assert.deepEqual(output[0].map(({ json }) => json.documentId), ['N8N-TEST00001']);
 });
 
 test('Get Many follows hasMore until the last page when returning all', async () => {
@@ -266,6 +404,105 @@ test('Get History honours the limit without fetching another page', async () => 
 	);
 });
 
+test('Get History uses the scoped v1 history route with the module name for OAuth2', async () => {
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'getHistory',
+				entryId: 'N8N-TEST00001',
+				returnAll: false,
+				limit: 1,
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9101, name: 'Task Tracker' }] };
+			}
+			if (options.url.endsWith('/v1/list')) {
+				return {
+					list: [{ entryId: 806548, documentId: 'N8N-TEST00001' }],
+				};
+			}
+			return { hasMore: false, histories: [{ id: 'history-1' }] };
+		},
+		'oAuth2',
+	);
+
+	const output = await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/workspaces/9001',
+				body: undefined,
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/list',
+				body: {
+					module: 'Task Tracker',
+					search: 'N8N-TEST00001',
+					currentPage: 0,
+					pageSize: 10,
+				},
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/history',
+				body: { module: 'Task Tracker', entryId: 806548, page: 0 },
+			},
+		],
+	);
+	assert.deepEqual(output[0].map(({ json }) => json.id), ['history-1']);
+});
+
+test('Get History sends a selected numeric Entry ID directly to OAuth2 history', async () => {
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'getHistory',
+				entryIdentifierType: 'entryId',
+				entryId: 806548,
+				returnAll: false,
+				limit: 1,
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9101, name: 'Task Tracker' }] };
+			}
+			if (options.url.endsWith('/v1/list')) {
+				throw new Error('A selected Entry ID must not be searched as a document ID');
+			}
+			return { hasMore: false, histories: [{ id: 'history-1' }] };
+		},
+		'oAuth2',
+	);
+
+	const output = await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/workspaces/9001',
+				body: undefined,
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/history',
+				body: { module: 'Task Tracker', entryId: 806548, page: 0 },
+			},
+		],
+	);
+	assert.deepEqual(output[0].map(({ json }) => json.id), ['history-1']);
+});
+
 test('Get Form describes an activity and only sends an entry when one is given', async () => {
 	const form = {
 		module: 'Task Tracker',
@@ -311,6 +548,111 @@ test('Get Form describes an activity and only sends an entry when one is given',
 	assert.deepEqual(
 		output[0].map(({ json }) => json.confidence_threshold),
 		[0.8, 0.8],
+	);
+});
+
+test('Get Form uses the scoped v1 form route with the module name for OAuth2', async () => {
+	const form = {
+		module: 'Task Tracker',
+		activity: 'approve',
+		form: [{ name: 'Decision', type: 'Selection' }],
+	};
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'getForm',
+				formActivity: { mode: 'list', value: 'approve' },
+				formEntryId: 'N8N-TEST00001',
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9101, name: 'Task Tracker' }] };
+			}
+			if (options.url.endsWith('/v1/list')) {
+				return {
+					list: [{ entryId: 806548, documentId: 'N8N-TEST00001' }],
+				};
+			}
+			return form;
+		},
+		'oAuth2',
+	);
+
+	const output = await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/workspaces/9001',
+				body: undefined,
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/list',
+				body: {
+					module: 'Task Tracker',
+					search: 'N8N-TEST00001',
+					currentPage: 0,
+					pageSize: 10,
+				},
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/form',
+				body: {
+					module: 'Task Tracker',
+					activity: 'approve',
+					entryId: 806548,
+				},
+			},
+		],
+	);
+	assert.deepEqual(output, [[{ json: form, pairedItem: { item: 0 } }]]);
+});
+
+test('Get Form sends a selected numeric Entry ID directly to OAuth2 form', async () => {
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'getForm',
+				formActivity: { mode: 'list', value: 'approve' },
+				entryIdentifierType: 'entryId',
+				formEntryId: 806548,
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/v1/workspaces/9001')) {
+				return { modules: [{ id: 9101, name: 'Task Tracker' }] };
+			}
+			if (options.url.endsWith('/v1/list')) {
+				throw new Error('A selected Entry ID must not be searched as a document ID');
+			}
+			return { form: [] };
+		},
+		'oAuth2',
+	);
+
+	await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/workspaces/9001',
+				body: undefined,
+			},
+			{
+				credentialName: 'inistateOAuth2Api',
+				url: 'https://api.inistate.com/v1/form',
+				body: { module: 'Task Tracker', activity: 'approve', entryId: 806548 },
+			},
+		],
 	);
 });
 
