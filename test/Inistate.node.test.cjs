@@ -447,6 +447,89 @@ test('executes Delete and Duplicate with the Zapier-compatible activity contract
 	]);
 });
 
+test('OAuth Duplicate returns the newly created entry identity', async () => {
+	const node = new Inistate();
+	const requests = [];
+	let listRequestCount = 0;
+	const source = {
+		module: 'Task Tracker',
+		entryId: 1001,
+		documentId: 'TASK00001',
+		data: { Title: 'Duplicate me' },
+		state: 'Backlog',
+	};
+	const duplicate = {
+		module: 'Task Tracker',
+		entryId: 1002,
+		documentId: 'TASK00002',
+		data: { Title: 'Duplicate me' },
+		state: 'Backlog',
+	};
+	const parameters = {
+		authentication: 'oAuth2',
+		operation: 'duplicate',
+		workspaceId: { value: '9001' },
+		moduleId: { value: '9101' },
+		documentId: 'TASK00001',
+	};
+	const context = {
+		getCredentials: async () => ({ baseUrl: '' }),
+		getInputData: () => [{ json: {} }],
+		getNodeParameter(name, _itemIndex, fallback, options) {
+			return extractParameter(parameters[name] ?? fallback, options);
+		},
+		helpers: {
+			async httpRequestWithAuthentication(credentialName, options) {
+				requests.push({ credentialName, options });
+				if (options.url.endsWith('/v1/workspaces/9001')) {
+					return { modules: [{ id: 9101, name: 'Task Tracker' }] };
+				}
+				if (options.url.endsWith('/v1/list')) {
+					listRequestCount++;
+					if (listRequestCount === 1) return { list: [source] };
+					if (listRequestCount === 2) return { list: [] };
+					return { list: [duplicate] };
+				}
+				if (options.url.endsWith('/v1/activity')) {
+					return {
+						module: 'Task Tracker',
+						activity: 'duplicate',
+						entryId: source.entryId,
+					};
+				}
+				throw new Error(`Unexpected OAuth Duplicate URL: ${options.url}`);
+			},
+		},
+		continueOnFail: () => false,
+		getNode: () => ({
+			name: 'Duplicate entry',
+			parameters: { authentication: 'oAuth2' },
+		}),
+	};
+
+	const output = await node.execute.call(context);
+
+	assert.equal(
+		requests.find(({ options }) => options.url.endsWith('/v1/activity')).options.body.entryId,
+		1001,
+	);
+	assert.deepEqual(output, [
+		[
+			{
+				json: {
+					module: 'Task Tracker',
+					activity: 'duplicate',
+					entryId: 1002,
+					documentId: 'TASK00002',
+					data: { Title: 'Duplicate me' },
+					state: 'Backlog',
+				},
+				pairedItem: { item: 0 },
+			},
+		],
+	]);
+});
+
 test('returns a per-item error when Continue On Fail is enabled', async () => {
 	const node = new Inistate();
 	const context = {
@@ -773,9 +856,7 @@ test('loads OAuth user-reference options from the module named by the v1 form', 
 			}
 			if (options.url.endsWith('/v1/form')) {
 				return {
-					form: [
-						{ reportedBy: { type: 'User', module: 'User Profile' } },
-					],
+					form: [{ reportedBy: { type: 'User', module: 'User Profile' } }],
 				};
 			}
 			if (options.url.endsWith('/v1/list')) {
@@ -799,7 +880,10 @@ test('loads OAuth user-reference options from the module named by the v1 form', 
 	);
 
 	const result = await resourceMapping.getFormFields.call(context);
-	assert.deepEqual(result.fields[0].options?.map(({ name }) => name), ['N8N Test User']);
+	assert.deepEqual(
+		result.fields[0].options?.map(({ name }) => name),
+		['N8N Test User'],
+	);
 	const selectionRequest = requests.find(({ options }) => options.url.endsWith('/v1/list'));
 	assert.deepEqual(selectionRequest.options.body, {
 		module: 'User Profile',
@@ -849,9 +933,10 @@ test('loads OAuth module-reference options for a custom activity through v1 list
 	);
 
 	const result = await resourceMapping.getFormFields.call(context);
-	assert.deepEqual(result.fields[0].options?.map(({ name }) => name), [
-		'N8N Sandbox Project',
-	]);
+	assert.deepEqual(
+		result.fields[0].options?.map(({ name }) => name),
+		['N8N Sandbox Project'],
+	);
 	const selectionRequest = requests.find(({ options }) => options.url.endsWith('/v1/list'));
 	assert.equal(selectionRequest.options.body.module, 'Projects');
 	const formRequest = requests.find(({ options }) => options.url.endsWith('/v1/form'));

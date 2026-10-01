@@ -1,10 +1,6 @@
 import type { IHttpRequestOptions } from 'n8n-workflow';
 
-import {
-	findEntryByIdentifier,
-	isRecord,
-	workspaceModules,
-} from './response';
+import { findEntryByIdentifier, isRecord, nestedCollection, workspaceModules } from './response';
 import {
 	authenticatedRequest,
 	type InistateRequestAdapter,
@@ -60,10 +56,7 @@ function toV1ActivityInput(value: unknown): unknown {
 
 		const fieldName = key.slice(0, -2);
 		const fieldValue = value[fieldName];
-		if (
-			fieldValue === undefined ||
-			(typeof id !== 'string' && typeof id !== 'number')
-		) {
+		if (fieldValue === undefined || (typeof id !== 'string' && typeof id !== 'number')) {
 			continue;
 		}
 
@@ -81,6 +74,35 @@ function toV1ActivityInput(value: unknown): unknown {
 	return input;
 }
 
+function entryIdentity(entry: Record<string, unknown>): string {
+	const value = entry.entryId ?? entry.id;
+	return value === undefined ? '' : String(value);
+}
+
+function stableValue(value: unknown): string {
+	if (Array.isArray(value)) {
+		return `[${value.map(stableValue).join(',')}]`;
+	}
+	if (isRecord(value)) {
+		return `{${Object.keys(value)
+			.sort()
+			.map((key) => `${JSON.stringify(key)}:${stableValue(value[key])}`)
+			.join(',')}}`;
+	}
+	return JSON.stringify(value) ?? String(value);
+}
+
+function hasSameDuplicateContent(
+	candidate: Record<string, unknown>,
+	source: Record<string, unknown> | undefined,
+): boolean {
+	return (
+		source !== undefined &&
+		stableValue(candidate.data) === stableValue(source.data) &&
+		stableValue(candidate.state) === stableValue(source.state)
+	);
+}
+
 export class InistateOAuthAdapter implements InistateRequestAdapter {
 	constructor(
 		private readonly context: InistateRequestFunctions,
@@ -94,16 +116,81 @@ export class InistateOAuthAdapter implements InistateRequestAdapter {
 		const requestOptions = requestConfig.preserveLegacyPath
 			? options
 			: await this.adaptRequest(options, requestConfig);
-		return await this.send(requestOptions);
+		if (!this.isDuplicateActivity(requestOptions)) {
+			return await this.send(requestOptions);
+		}
+
+		const entriesBefore = await this.listModuleEntries(requestOptions);
+		const response = await this.send(requestOptions);
+		return await this.resolveDuplicateResponse(requestOptions, entriesBefore, response);
 	}
 
 	private async send(options: IHttpRequestOptions): Promise<unknown> {
-		return await authenticatedRequest(
-			this.context,
-			'inistateOAuth2Api',
-			this.baseUrl,
-			options,
+		return await authenticatedRequest(this.context, 'inistateOAuth2Api', this.baseUrl, options);
+	}
+
+	private isDuplicateActivity(options: IHttpRequestOptions): boolean {
+		const body = isRecord(options.body) ? options.body : {};
+		return options.url === '/v1/activity' && body.activity === 'duplicate';
+	}
+
+	private async listModuleEntries(
+		options: IHttpRequestOptions,
+	): Promise<Array<Record<string, unknown>>> {
+		const body = isRecord(options.body) ? options.body : {};
+		const response = await this.send({
+			method: 'POST',
+			url: '/v1/list',
+			headers: options.headers,
+			body: {
+				module: body.module,
+				currentPage: 0,
+				pageSize: 500,
+			},
+		});
+		return nestedCollection(response, 'list').filter(isRecord);
+	}
+
+	private async resolveDuplicateResponse(
+		options: IHttpRequestOptions,
+		entriesBefore: Array<Record<string, unknown>>,
+		response: unknown,
+	): Promise<unknown> {
+		const responseRecord = isRecord(response) ? response : {};
+		const responseEntryId = entryIdentity(responseRecord);
+		const identitiesBefore = new Set(entriesBefore.map(entryIdentity).filter(Boolean));
+		const body = isRecord(options.body) ? options.body : {};
+		const sourceId = String(body.entryId ?? '');
+		if (sourceId) {
+			identitiesBefore.add(sourceId);
+		}
+
+		// Some backend versions already return the duplicate. Preserve that response.
+		if (responseEntryId && !identitiesBefore.has(responseEntryId)) {
+			return response;
+		}
+
+		const entriesAfter = await this.listModuleEntries(options);
+		let candidates = entriesAfter.filter(
+			(entry) => entryIdentity(entry) && !identitiesBefore.has(entryIdentity(entry)),
 		);
+		if (candidates.length > 1) {
+			const source = entriesBefore.find((entry) => entryIdentity(entry) === sourceId);
+			const matchingCandidates = candidates.filter((entry) =>
+				hasSameDuplicateContent(entry, source),
+			);
+			if (matchingCandidates.length === 1) {
+				candidates = matchingCandidates;
+			}
+		}
+
+		if (candidates.length !== 1) {
+			throw new Error(
+				'The duplicate entry was created, but its new identity could not be resolved uniquely',
+			);
+		}
+
+		return { ...responseRecord, ...candidates[0] };
 	}
 
 	private async resolveModuleName(
@@ -179,10 +266,7 @@ export class InistateOAuthAdapter implements InistateRequestAdapter {
 		}
 
 		const workspaceMatch = options.url.match(/^\/api\/Workspace\/([^/]+)$/i);
-		if (
-			workspaceMatch &&
-			!['module', 'list'].includes(workspaceMatch[1].toLocaleLowerCase())
-		) {
+		if (workspaceMatch && !['module', 'list'].includes(workspaceMatch[1].toLocaleLowerCase())) {
 			return { ...options, url: `/v1/workspaces/${workspaceMatch[1]}` };
 		}
 
