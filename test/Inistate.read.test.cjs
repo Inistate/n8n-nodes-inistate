@@ -262,7 +262,10 @@ test('Get Many uses the scoped v1 list route with the module name for OAuth2', a
 			},
 		],
 	);
-	assert.deepEqual(output[0].map(({ json }) => json.documentId), ['N8N-TEST00001']);
+	assert.deepEqual(
+		output[0].map(({ json }) => json.documentId),
+		['N8N-TEST00001'],
+	);
 });
 
 test('Get Many follows hasMore until the last page when returning all', async () => {
@@ -345,7 +348,15 @@ test('Get Many forwards the listing and every supplied option', async () => {
 
 test('Get History pages the audit trail and emits one item per record', async () => {
 	const context = createContext(
-		[{ ...workspaceAndModule, operation: 'getHistory', entryId: '806548', returnAll: true }],
+		[
+			{
+				...workspaceAndModule,
+				operation: 'getHistory',
+				entryIdentifierType: 'entryId',
+				entryId: '806548',
+				returnAll: true,
+			},
+		],
 		(options) =>
 			options.body.page === 0
 				? {
@@ -387,7 +398,8 @@ test('Get History honours the limit without fetching another page', async () => 
 			{
 				...workspaceAndModule,
 				operation: 'getHistory',
-				entryId: 'N8N-TEST00001',
+				entryIdentifierType: 'entryId',
+				entryId: 806548,
 				returnAll: false,
 				limit: 1,
 			},
@@ -401,6 +413,54 @@ test('Get History honours the limit without fetching another page', async () => 
 	assert.deepEqual(
 		output[0].map(({ json }) => json.id),
 		['1'],
+	);
+});
+
+test('Get History resolves a selected document ID before an API-key history request', async () => {
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'getHistory',
+				entryIdentifierType: 'documentId',
+				entryId: 'N8N-TEST00001',
+				returnAll: false,
+				limit: 1,
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/api/mcp/list')) {
+				return { list: [{ entryId: 806548, documentId: 'N8N-TEST00001' }] };
+			}
+			return { hasMore: false, histories: [{ id: 'history-1' }] };
+		},
+	);
+
+	const output = await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateApi',
+				url: 'https://api.inistate.com/api/mcp/list',
+				body: {
+					module: '9101',
+					search: 'N8N-TEST00001',
+					currentPage: 0,
+					pageSize: 10,
+				},
+			},
+			{
+				credentialName: 'inistateApi',
+				url: 'https://api.inistate.com/api/mcp/history',
+				body: { module: '9101', entryId: 806548, page: 0 },
+			},
+		],
+	);
+	assert.deepEqual(
+		output[0].map(({ json }) => json.id),
+		['history-1'],
 	);
 });
 
@@ -456,7 +516,10 @@ test('Get History uses the scoped v1 history route with the module name for OAut
 			},
 		],
 	);
-	assert.deepEqual(output[0].map(({ json }) => json.id), ['history-1']);
+	assert.deepEqual(
+		output[0].map(({ json }) => json.id),
+		['history-1'],
+	);
 });
 
 test('Get History sends a selected numeric Entry ID directly to OAuth2 history', async () => {
@@ -500,7 +563,10 @@ test('Get History sends a selected numeric Entry ID directly to OAuth2 history',
 			},
 		],
 	);
-	assert.deepEqual(output[0].map(({ json }) => json.id), ['history-1']);
+	assert.deepEqual(
+		output[0].map(({ json }) => json.id),
+		['history-1'],
+	);
 });
 
 test('Get Form describes an activity and only sends an entry when one is given', async () => {
@@ -527,7 +593,12 @@ test('Get Form describes an activity and only sends an entry when one is given',
 				formEntryId: '',
 			},
 		],
-		() => form,
+		(options) => {
+			if (options.url.endsWith('/api/mcp/list')) {
+				return { list: [{ entryId: 806548, documentId: 'N8N-TEST00001' }] };
+			}
+			return form;
+		},
 	);
 
 	const output = await new Inistate().execute.call(context);
@@ -536,8 +607,17 @@ test('Get Form describes an activity and only sends an entry when one is given',
 		context.requests.map(({ url, body }) => ({ url, body })),
 		[
 			{
+				url: 'https://api.inistate.com/api/mcp/list',
+				body: {
+					module: '9101',
+					search: 'N8N-TEST00001',
+					currentPage: 0,
+					pageSize: 10,
+				},
+			},
+			{
 				url: 'https://api.inistate.com/api/mcp/form',
-				body: { module: '9101', activity: 'approve', entryId: 'N8N-TEST00001' },
+				body: { module: '9101', activity: 'approve', entryId: 806548 },
 			},
 			{
 				url: 'https://api.inistate.com/api/mcp/form',
@@ -549,6 +629,41 @@ test('Get Form describes an activity and only sends an entry when one is given',
 		output[0].map(({ json }) => json.confidence_threshold),
 		[0.8, 0.8],
 	);
+});
+
+test('Get Form sends a selected numeric Entry ID directly for an API-key request', async () => {
+	const form = { module: 'Task Tracker', activity: 'approve', form: [] };
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'getForm',
+				formActivity: { mode: 'list', value: 'approve' },
+				entryIdentifierType: 'entryId',
+				formEntryId: 806548,
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/api/mcp/list')) {
+				throw new Error('A selected Entry ID must not trigger document-ID resolution');
+			}
+			return form;
+		},
+	);
+
+	const output = await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateApi',
+				url: 'https://api.inistate.com/api/mcp/form',
+				body: { module: '9101', activity: 'approve', entryId: '806548' },
+			},
+		],
+	);
+	assert.deepEqual(output, [[{ json: form, pairedItem: { item: 0 } }]]);
 });
 
 test('Get Form uses the scoped v1 form route with the module name for OAuth2', async () => {
