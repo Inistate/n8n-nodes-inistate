@@ -59,7 +59,7 @@ const workspaceAndModule = {
 	moduleId: { mode: 'id', value: '9101' },
 };
 
-test('Get returns the entry with its state and legal activities intact', async () => {
+test('Get resolves a selected document ID before an API-key entry request', async () => {
 	const entry = {
 		module: 'Task Tracker',
 		entryId: 806548,
@@ -77,21 +77,70 @@ test('Get returns the entry with its state and legal activities intact', async (
 	};
 	const context = createContext(
 		[{ ...workspaceAndModule, operation: 'get', entryId: 'N8N-TEST00001' }],
-		() => entry,
+		(options) => {
+			if (options.url.endsWith('/api/mcp/list')) {
+				return { list: [entry] };
+			}
+			return entry;
+		},
 	);
 
 	const output = await new Inistate().execute.call(context);
 
-	assert.deepEqual(context.requests, [
-		{
-			credentialName: 'inistateApi',
-			method: 'POST',
-			url: 'https://api.inistate.com/api/mcp/entry',
-			headers: { wsId: '9001' },
-			body: { module: '9101', entryId: 'N8N-TEST00001' },
-			json: true,
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateApi',
+				url: 'https://api.inistate.com/api/mcp/list',
+				body: {
+					module: '9101',
+					search: 'N8N-TEST00001',
+					currentPage: 0,
+					pageSize: 10,
+				},
+			},
+			{
+				credentialName: 'inistateApi',
+				url: 'https://api.inistate.com/api/mcp/entry',
+				body: { module: '9101', entryId: 806548 },
+			},
+		],
+	);
+	assert.deepEqual(output, [[{ json: entry, pairedItem: { item: 0 } }]]);
+});
+
+test('Get sends a selected numeric Entry ID directly for an API-key request', async () => {
+	const entry = { entryId: 806548, documentId: 'N8N-TEST00001' };
+	const context = createContext(
+		[
+			{
+				...workspaceAndModule,
+				operation: 'get',
+				entryIdentifierType: 'entryId',
+				entryId: 806548,
+			},
+		],
+		(options) => {
+			if (options.url.endsWith('/api/mcp/list')) {
+				throw new Error('A selected Entry ID must not trigger document-ID resolution');
+			}
+			return entry;
 		},
-	]);
+	);
+
+	const output = await new Inistate().execute.call(context);
+
+	assert.deepEqual(
+		context.requests.map(({ credentialName, url, body }) => ({ credentialName, url, body })),
+		[
+			{
+				credentialName: 'inistateApi',
+				url: 'https://api.inistate.com/api/mcp/entry',
+				body: { module: '9101', entryId: '806548' },
+			},
+		],
+	);
 	assert.deepEqual(output, [[{ json: entry, pairedItem: { item: 0 } }]]);
 });
 
@@ -774,12 +823,18 @@ test('Get Form sends a selected numeric Entry ID directly to OAuth2 form', async
 test('read requests do not claim an n8n write medium', async () => {
 	const context = createContext(
 		[{ ...workspaceAndModule, operation: 'get', entryId: 'N8N-TEST00001' }],
-		() => ({}),
+		(options) =>
+			options.url.endsWith('/api/mcp/list')
+				? { list: [{ entryId: 806548, documentId: 'N8N-TEST00001' }] }
+				: {},
 	);
 
 	await new Inistate().execute.call(context);
 
-	assert.deepEqual(context.requests[0].headers, { wsId: '9001' });
+	assert.deepEqual(
+		context.requests.map(({ headers }) => headers),
+		[{ wsId: '9001' }, { wsId: '9001' }],
+	);
 });
 
 test('rejects filters that are not a JSON object before any request is sent', async () => {

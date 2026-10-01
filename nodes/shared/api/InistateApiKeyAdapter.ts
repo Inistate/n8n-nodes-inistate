@@ -32,7 +32,7 @@ export class InistateApiKeyAdapter implements InistateRequestAdapter {
 	): Promise<IHttpRequestOptions> {
 		if (
 			requestConfig.entryIdentifierType !== 'documentId' ||
-			!/^\/api\/mcp\/(?:history|form)$/i.test(options.url)
+			!/^\/api\/mcp\/(?:entry|history|form)$/i.test(options.url)
 		) {
 			return options;
 		}
