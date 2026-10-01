@@ -181,6 +181,79 @@ async function getModuleForm(
 	});
 }
 
+async function getApiKeyEntryActivityForm(
+	context: InistateRequestFunctions,
+	workspaceId: string,
+	moduleId: string,
+	activityId: string,
+	documentId: string,
+): Promise<unknown> {
+	const listResponse = await inistateApiRequest(context, {
+		method: 'POST',
+		url: '/api/mcp/list',
+		headers: buildApiHeaders(workspaceId, false),
+		body: {
+			module: moduleId,
+			search: documentId,
+			currentPage: 0,
+			pageSize: 10,
+		},
+	});
+	const entry = findEntryByIdentifier(listResponse, documentId);
+	const entryId = isRecord(entry) ? (entry.entryId ?? entry.id) : undefined;
+	if (typeof entryId !== 'string' && typeof entryId !== 'number') {
+		throw new Error(`No accessible entry was found with document ID "${documentId}"`);
+	}
+
+	return await getModuleForm(context, workspaceId, moduleId, activityId, entryId);
+}
+
+function getReadOnlyFormDefaultValues(form: unknown): IDataObject {
+	if (!isRecord(form) || !isRecord(form.classificationForm)) {
+		return {};
+	}
+	const defaults = form.classificationForm.default;
+	if (!isRecord(defaults)) {
+		return {};
+	}
+
+	const values: IDataObject = {};
+	for (const element of extractFormElements(form)) {
+		if (element.readOnly !== true) {
+			continue;
+		}
+		const fieldName = getFormFieldName(element);
+		if (!fieldName) {
+			continue;
+		}
+		const defaultKey = [element.id, fieldName].find(
+			(key) => key !== undefined && Object.prototype.hasOwnProperty.call(defaults, String(key)),
+		);
+		if (defaultKey !== undefined) {
+			values[fieldName] = defaults[String(defaultKey)] as IDataObject[string];
+		}
+	}
+
+	return values;
+}
+
+export async function getApiKeyPerformActivityReadOnlyValues(
+	context: InistateRequestFunctions,
+	workspaceId: string,
+	moduleId: string,
+	activityId: string,
+	documentId: string,
+): Promise<IDataObject> {
+	const form = await getApiKeyEntryActivityForm(
+		context,
+		workspaceId,
+		moduleId,
+		activityId,
+		documentId,
+	);
+	return getReadOnlyFormDefaultValues(form);
+}
+
 export async function resolveMappedFieldValues(
 	context: InistateRequestFunctions,
 	workspaceId: string,
@@ -213,19 +286,17 @@ export async function resolveMappedFieldValues(
 	}
 
 	const form = await getModuleForm(context, workspaceId, moduleId, activityId);
-	const referenceElements = extractFormElements(form).filter(
-		(element) => {
-			const fieldName = getFormFieldName(element);
-			return (
-				getReferenceFieldType(element) !== undefined &&
-				fieldName.length > 0 &&
-				optionFieldNames.has(fieldName) &&
-				(usesOAuth(context)
-					? typeof element.module === 'string'
-					: typeof element.id === 'string' || typeof element.id === 'number')
-			);
-		},
-	);
+	const referenceElements = extractFormElements(form).filter((element) => {
+		const fieldName = getFormFieldName(element);
+		return (
+			getReferenceFieldType(element) !== undefined &&
+			fieldName.length > 0 &&
+			optionFieldNames.has(fieldName) &&
+			(usesOAuth(context)
+				? typeof element.module === 'string'
+				: typeof element.id === 'string' || typeof element.id === 'number')
+		);
+	});
 	for (const element of referenceElements) {
 		const fieldName = getFormFieldName(element);
 		const fieldType = getReferenceFieldType(element);
@@ -595,11 +666,12 @@ export const listSearch = {
 			body: { moduleId },
 		});
 		const activities = nestedCollection(response, 'activities').filter((activity) => {
-			const name = typeof activity === 'string'
-				? activity
-				: isRecord(activity) && typeof activity.name === 'string'
-					? activity.name
-					: '';
+			const name =
+				typeof activity === 'string'
+					? activity
+					: isRecord(activity) && typeof activity.name === 'string'
+						? activity.name
+						: '';
 			return !['create', 'edit'].includes(name.trim().toLocaleLowerCase());
 		});
 		return {
@@ -624,9 +696,8 @@ export const listSearch = {
 			const module = workspaceModules(workspace).find(
 				(candidate) => isRecord(candidate) && String(candidate.id) === moduleId,
 			);
-			const moduleName = isRecord(module) && typeof module.name === 'string'
-				? module.name.trim()
-				: '';
+			const moduleName =
+				isRecord(module) && typeof module.name === 'string' ? module.name.trim() : '';
 			if (!moduleName) {
 				return { results: [] };
 			}
@@ -771,58 +842,56 @@ export const resourceMapping = {
 					: 'create';
 		const response = await getModuleForm(this, workspaceId, moduleId, activityId);
 		const formElements = extractFormElements(response);
-		const referenceElements = formElements.filter((element) =>
-			getReferenceFieldType(element) !== undefined,
+		const referenceElements = formElements.filter(
+			(element) => getReferenceFieldType(element) !== undefined,
 		);
 		const referenceOptions = Object.fromEntries(
 			await Promise.all(
-				referenceElements
-					.map(async (element) => {
-						const fieldName = getFormFieldName(element);
-						const fieldId = element.id;
-						const fieldType = getReferenceFieldType(element);
-						const referenceModule =
-							typeof element.module === 'string' ? element.module : undefined;
-						if (
-							!fieldName ||
-							fieldType === undefined ||
-							(usesOAuth(this)
-								? !referenceModule
-								: typeof fieldId !== 'string' && typeof fieldId !== 'number')
-						) {
-							return [fieldName, []] as const;
-						}
+				referenceElements.map(async (element) => {
+					const fieldName = getFormFieldName(element);
+					const fieldId = element.id;
+					const fieldType = getReferenceFieldType(element);
+					const referenceModule = typeof element.module === 'string' ? element.module : undefined;
+					if (
+						!fieldName ||
+						fieldType === undefined ||
+						(usesOAuth(this)
+							? !referenceModule
+							: typeof fieldId !== 'string' && typeof fieldId !== 'number')
+					) {
+						return [fieldName, []] as const;
+					}
 
-						const options: INodePropertyOptions[] = [];
-						const seen = new Set<string>();
-						for (let currentPage = 0; currentPage < 10; currentPage++) {
-							const selectionResponse = await getReferenceSelection(
-								this,
-								workspaceId,
-								moduleId,
-								activityId,
-								fieldId as string | number | undefined,
-								referenceModule,
-								'',
-								currentPage,
-							);
-							const pageOptions = toReferenceFieldOptions(fieldType, selectionResponse);
-							let added = 0;
-							for (const option of pageOptions) {
-								const value = String(option.value);
-								if (!seen.has(value)) {
-									seen.add(value);
-									options.push(option);
-									added++;
-								}
-							}
-							if (pageOptions.length === 0 || added === 0) {
-								break;
+					const options: INodePropertyOptions[] = [];
+					const seen = new Set<string>();
+					for (let currentPage = 0; currentPage < 10; currentPage++) {
+						const selectionResponse = await getReferenceSelection(
+							this,
+							workspaceId,
+							moduleId,
+							activityId,
+							fieldId as string | number | undefined,
+							referenceModule,
+							'',
+							currentPage,
+						);
+						const pageOptions = toReferenceFieldOptions(fieldType, selectionResponse);
+						let added = 0;
+						for (const option of pageOptions) {
+							const value = String(option.value);
+							if (!seen.has(value)) {
+								seen.add(value);
+								options.push(option);
+								added++;
 							}
 						}
+						if (pageOptions.length === 0 || added === 0) {
+							break;
+						}
+					}
 
-						return [fieldName, options] as const;
-					}),
+					return [fieldName, options] as const;
+				}),
 			),
 		);
 		const fields = mapFormFields(response, referenceOptions);

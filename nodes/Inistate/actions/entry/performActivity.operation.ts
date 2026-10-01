@@ -1,6 +1,10 @@
 import type { INodeProperties, ResourceMapperValue } from 'n8n-workflow';
 
-import { resolveMappedFieldValues } from '../../../shared/GenericFunctions';
+import {
+	getApiKeyPerformActivityReadOnlyValues,
+	resolveMappedFieldValues,
+} from '../../../shared/GenericFunctions';
+import { usesOAuth } from '../../../shared/api';
 import { documentIdProperty, fieldsProperty, idMode, listMode } from './properties';
 import type { EntryActionDefinition } from './types';
 
@@ -32,19 +36,30 @@ export const performActivityAction: EntryActionDefinition = {
 		const activityId = String(
 			this.getNodeParameter('activityId', itemIndex, '', { extractValue: true }),
 		);
+		const documentId = String(this.getNodeParameter('documentId', itemIndex));
 		const fields = this.getNodeParameter('fields', itemIndex) as ResourceMapperValue;
+		const selectedFields = await resolveMappedFieldValues(
+			this,
+			workspaceId,
+			moduleId,
+			activityId,
+			fields,
+		);
+		const readOnlyValues = usesOAuth(this)
+			? {}
+			: await getApiKeyPerformActivityReadOnlyValues(
+					this,
+					workspaceId,
+					moduleId,
+					activityId,
+					documentId,
+				);
 		return {
 			operation: 'performActivity',
 			moduleId,
-			documentId: String(this.getNodeParameter('documentId', itemIndex)),
+			documentId,
 			activityId,
-			fields: await resolveMappedFieldValues(
-				this,
-				workspaceId,
-				moduleId,
-				activityId,
-				fields,
-			),
+			fields: { ...selectedFields, ...readOnlyValues },
 		};
 	},
 };

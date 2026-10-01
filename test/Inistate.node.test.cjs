@@ -395,6 +395,95 @@ test('uses an encoded OAuth reference selection without reloading the reference 
 	});
 });
 
+test('API-key Perform Activity preserves current read-only form values', async () => {
+	const node = new Inistate();
+	const requests = [];
+	const parameters = {
+		authentication: 'apiKey',
+		operation: 'performActivity',
+		workspaceId: { mode: 'id', value: '12661' },
+		moduleId: { mode: 'id', value: '53677' },
+		documentId: 'TSK00058',
+		activityId: { mode: 'id', value: 'complete-task' },
+		fields: {
+			mappingMode: 'defineBelow',
+			value: {
+				rwKynWhR: 'attempted override',
+				lDhrsxnj: 'Completed',
+				uETxdaDw: 2,
+			},
+			matchingColumns: [],
+			schema: [],
+			attemptToConvertTypes: false,
+			convertFieldsToString: false,
+		},
+	};
+	const context = {
+		getCredentials: async () => ({ baseUrl: '' }),
+		getInputData: () => [{ json: {} }],
+		getNode: () => ({ name: 'Complete task', parameters }),
+		getNodeParameter(name, _itemIndex, fallback, options) {
+			return extractParameter(parameters[name] ?? fallback, options);
+		},
+		helpers: {
+			async httpRequestWithAuthentication(credentialName, options) {
+				requests.push({ credentialName, options });
+				if (options.url.endsWith('/api/mcp/list')) {
+					return { list: [{ entryId: 10280259, documentId: 'TSK00058' }] };
+				}
+				if (options.url.endsWith('/api/Activity/Form')) {
+					return {
+						classificationForm: {
+							design: {
+								rows: [
+									{
+										items: [
+											{
+												id: 'rwKynWhR',
+												fieldName: 'rwKynWhR',
+												readOnly: true,
+												type: 0,
+											},
+										],
+									},
+								],
+							},
+							default: { rwKynWhR: 'REG-1918 Direct state and filtered reads' },
+						},
+					};
+				}
+				if (options.url.endsWith('/api/activity/')) {
+					return { activity: 'Complete Task' };
+				}
+
+				throw new Error(`Unexpected API-key execution URL: ${options.url}`);
+			},
+		},
+		continueOnFail: () => false,
+	};
+
+	await node.execute.call(context);
+
+	assert.deepEqual(
+		requests.map(({ options }) => options.url),
+		[
+			'https://api.inistate.com/api/mcp/list',
+			'https://api.inistate.com/api/Activity/Form',
+			'https://api.inistate.com/api/activity/',
+		],
+	);
+	assert.deepEqual(requests[1].options.body, {
+		vectorId: '53677',
+		activityId: 'complete-task',
+		entryId: 10280259,
+	});
+	assert.deepEqual(requests[2].options.body.payload, {
+		rwKynWhR: 'REG-1918 Direct state and filtered reads',
+		lDhrsxnj: 'Completed',
+		uETxdaDw: 2,
+	});
+});
+
 test('executes Delete and Duplicate with the Zapier-compatible activity contracts', async () => {
 	const node = new Inistate();
 	const requests = [];
@@ -694,6 +783,85 @@ test('implements Workspace, Module, Activity, Field, State Name, State ID, and U
 		vectorId: '9101',
 		activityId: 'activity-1',
 	});
+});
+
+test('hides API-key activity read-only values from the field mapping UI', async () => {
+	const requests = [];
+	const context = createLoadContext(
+		{
+			workspaceId: { value: '12661' },
+			moduleId: { value: '53677' },
+			operation: 'performActivity',
+			activityId: { value: 'complete-task' },
+			documentId: 'TSK00058',
+		},
+		(options) => {
+			if (options.url.endsWith('/api/Activity/Form')) {
+				return {
+					classificationForm: {
+						design: {
+							rows: [
+								{
+									items: [
+										{
+											id: 'rwKynWhR',
+											fieldName: 'rwKynWhR',
+											displayName: 'Task Title',
+											readOnly: true,
+											type: 0,
+										},
+										{
+											id: 'lDhrsxnj',
+											fieldName: 'lDhrsxnj',
+											displayName: 'Completion Note',
+											required: true,
+											type: 16,
+										},
+									],
+								},
+							],
+						},
+					},
+				};
+			}
+
+			throw new Error(`Unexpected form-loader URL: ${options.url}`);
+		},
+		requests,
+	);
+
+	const result = await resourceMapping.getFormFields.call(context);
+
+	assert.deepEqual(
+		requests.map(({ options }) => options.url),
+		['https://api.inistate.com/api/Activity/Form'],
+	);
+	assert.deepEqual(requests[0].options.body, {
+		vectorId: '53677',
+		activityId: 'complete-task',
+	});
+	assert.deepEqual(result.fields, [
+		{
+			id: 'rwKynWhR',
+			displayName: 'Task Title',
+			defaultMatch: false,
+			canBeUsedToMatch: false,
+			required: false,
+			display: false,
+			readOnly: true,
+			type: 'string',
+		},
+		{
+			id: 'lDhrsxnj',
+			displayName: 'Completion Note',
+			defaultMatch: false,
+			canBeUsedToMatch: false,
+			required: true,
+			display: true,
+			readOnly: false,
+			type: 'string',
+		},
+	]);
 });
 
 test('loads Module and User form fields as dropdown options', async () => {
