@@ -50,7 +50,7 @@ export class Inistate implements INodeType {
 					{ name: 'API Key', value: 'apiKey' },
 					{ name: 'OAuth2', value: 'oAuth2' },
 				],
-				default: 'apiKey',
+				default: 'oAuth2',
 			},
 			{
 				displayName: 'Resource',

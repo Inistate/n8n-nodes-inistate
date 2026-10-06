@@ -185,7 +185,7 @@ test('offers API key and OAuth2 authentication on both nodes', () => {
 			authentication.options.map(({ value }) => value),
 			['apiKey', 'oAuth2'],
 		);
-		assert.equal(authentication.default, 'apiKey');
+		assert.equal(authentication.default, 'oAuth2');
 		assert.deepEqual(
 			node.description.credentials.map(({ name }) => name),
 			['inistateApi', 'inistateOAuth2Api'],
