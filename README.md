@@ -199,6 +199,31 @@ If the ID and display value come from separate properties, combine them explicit
 A plain displayed value is accepted only when it uniquely matches a loaded option. This prevents
 duplicate names from selecting the wrong entry.
 
+### Table fields (line items)
+
+A table field, such as an invoice's **Lines**, appears as one field whose label lists its columns,
+for example `Lines (JSON rows: Item Code, Qty, Unit Price)`. Give it an array of rows, one object
+per row, either as an expression or as JSON text:
+
+```js
+={{ $json.lines }}
+```
+
+```json
+[{ "Item Code": "CAT6-305", "Qty": 2 }, { "Item Code": "POC-TEST-02", "Qty": 1 }]
+```
+
+- A column may be named by its display name or its internal field name, in any case.
+- Rows from a Get result can be written back: the `{ "value": … }` and `{ "id": …, "value": … }`
+  shapes a read returns are accepted.
+- Empty cells and empty rows are left out, so the pre-filled row template sends nothing until it is
+  filled in. To send no rows, give `[]`.
+- A column the form doesn't have stops the item with an error naming it.
+- Create drops a row's `id`, which would name another entry's row; Update and Perform Activity keep
+  it, so an edited row stays the same row.
+- When the rows come from several input items (one item per line), combine them first with n8n's
+  **Aggregate** node and map the aggregated list into the table field.
+
 ## Compatibility
 
 - Minimum supported n8n version: `2.35.5`

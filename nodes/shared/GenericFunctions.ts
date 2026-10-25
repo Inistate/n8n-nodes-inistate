@@ -17,7 +17,9 @@ import {
 	extractFormElements,
 	getFormDefaultValues,
 	getMappedFieldValues,
+	isTableMapperField,
 	mapFormFields,
+	normalizeTableValues,
 	toReferenceFieldOptions,
 	toFieldSearchItems,
 	toSearchItems,
@@ -281,7 +283,11 @@ export async function resolveMappedFieldValues(
 			)
 			.map((field) => field.id),
 	);
-	if (optionFieldNames.size === 0) {
+	const hasTableValues = fields.schema.some(
+		(field) =>
+			isTableMapperField(field) && Object.prototype.hasOwnProperty.call(rawValues, field.id),
+	);
+	if (optionFieldNames.size === 0 && !hasTableValues) {
 		return mappedValues;
 	}
 
@@ -362,7 +368,9 @@ export async function resolveMappedFieldValues(
 		}
 	}
 
-	return mappedValues;
+	return hasTableValues
+		? normalizeTableValues(mappedValues, form, { keepRowIds: activityId !== 'create' })
+		: mappedValues;
 }
 
 async function getReferenceSelection(
