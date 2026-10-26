@@ -1,7 +1,7 @@
 import type { ResourceMapperValue } from 'n8n-workflow';
 
 import { resolveMappedFieldValues } from '../../../shared/GenericFunctions';
-import { fieldsProperty } from './properties';
+import { fieldsProperty, tableFieldsNoticeProperty } from './properties';
 import type { EntryActionDefinition } from './types';
 
 export const createEntryAction: EntryActionDefinition = {
@@ -12,7 +12,7 @@ export const createEntryAction: EntryActionDefinition = {
 		action: 'Create an entry',
 		description: 'Create an entry using its module form',
 	},
-	properties: [fieldsProperty('create')],
+	properties: [tableFieldsNoticeProperty('create'), fieldsProperty('create')],
 	async prepareInput({ itemIndex, moduleId, workspaceId }) {
 		const fields = this.getNodeParameter('fields', itemIndex) as ResourceMapperValue;
 		return {

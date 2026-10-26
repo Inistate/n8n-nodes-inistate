@@ -56,6 +56,26 @@ export function documentIdProperty(
 	};
 }
 
+/**
+ * n8n's resource mapper cannot describe a single field, so table fields are explained here.
+ * Create starts with an empty table; the other operations overwrite the table they send.
+ */
+export function tableFieldsNoticeProperty(
+	operation: Extract<P0Operation, 'create' | 'update' | 'performActivity'>,
+): INodeProperties {
+	const example = 'e.g. [{"Qty": 1}, {"Qty": 2}]';
+	return {
+		displayName:
+			operation === 'create'
+				? `A table field takes a JSON array with one object per row, ${example}`
+				: `A table field takes a JSON array with one object per row, ${example}. The rows sent replace all of the table's rows: to add a row, include the existing rows (with their id) and the new one.`,
+		name: `${operation}TableFieldsNotice`,
+		type: 'notice',
+		default: '',
+		displayOptions: { show: { operation: [operation] } },
+	};
+}
+
 export function fieldsProperty(
 	operation: Extract<P0Operation, 'create' | 'update' | 'performActivity'>,
 ): INodeProperties {

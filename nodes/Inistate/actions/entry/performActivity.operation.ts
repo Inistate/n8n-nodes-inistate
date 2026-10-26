@@ -5,7 +5,13 @@ import {
 	resolveMappedFieldValues,
 } from '../../../shared/GenericFunctions';
 import { usesOAuth } from '../../../shared/api';
-import { documentIdProperty, fieldsProperty, idMode, listMode } from './properties';
+import {
+	documentIdProperty,
+	fieldsProperty,
+	idMode,
+	listMode,
+	tableFieldsNoticeProperty,
+} from './properties';
 import type { EntryActionDefinition } from './types';
 
 const activityProperty: INodeProperties = {
@@ -30,6 +36,7 @@ export const performActivityAction: EntryActionDefinition = {
 	properties: [
 		documentIdProperty('performActivity'),
 		activityProperty,
+		tableFieldsNoticeProperty('performActivity'),
 		fieldsProperty('performActivity'),
 	],
 	async prepareInput({ itemIndex, moduleId, workspaceId }) {
