@@ -120,11 +120,11 @@ test('reads table columns from both form shapes', () => {
 	);
 });
 
-test('maps a table to an untyped JSON rows field that names its writable columns', () => {
+test('maps a table to an untyped field whose row template names its writable columns', () => {
 	const [, apiKeyLines] = mapFormFields(apiKeyInvoiceForm);
 	assert.deepEqual(apiKeyLines, {
 		id: 'lines',
-		displayName: 'Lines (JSON rows: Item Code, Qty, Unit Price, Owner)',
+		displayName: 'Lines (table)',
 		defaultMatch: false,
 		canBeUsedToMatch: false,
 		required: false,
@@ -139,7 +139,7 @@ test('maps a table to an untyped JSON rows field that names its writable columns
 	assert.equal(isTableMapperField(customerCode), false);
 	assert.equal(oauthLines.id, 'Lines');
 	assert.equal(oauthLines.type, undefined);
-	assert.equal(oauthLines.displayName, 'Lines (JSON rows: Item Code, Qty, Unit Price, Owner)');
+	assert.equal(oauthLines.displayName, 'Lines (table)');
 });
 
 test('API-key rows are sent by column field name, typed, with empty cells dropped', () => {
@@ -273,7 +273,10 @@ test('refuses rows it cannot send, naming the table and the column', () => {
 	);
 	assert.throws(
 		() => normalizeTableValues({ Lines: '[{"Qty": 1' }, oauthInvoiceForm, { keepRowIds: false }),
-		{ message: '"Lines" must be a JSON array of rows, for example [{"Qty": 1}]' },
+		{
+			message:
+				'"Lines" is not valid JSON. Check the quotes, commas, and brackets, for example [{"Qty": 1}, {"Qty": 2}]',
+		},
 	);
 	assert.throws(
 		() => normalizeTableValues({ Lines: 42 }, oauthInvoiceForm, { keepRowIds: false }),
@@ -309,7 +312,7 @@ test('API-key Create sends table rows by field name in the activity payload', as
 			matchingColumns: [],
 			schema: [
 				{ id: 'debtorCode', type: 'string' },
-				{ id: 'lines', displayName: 'Lines (JSON rows: Item Code, Qty, Unit Price, Owner)' },
+				{ id: 'lines', displayName: 'Lines (table)' },
 			],
 			attemptToConvertTypes: false,
 			convertFieldsToString: false,
@@ -556,9 +559,26 @@ test('the field mapping UI offers an OAuth table as a JSON rows field', async ()
 	const result = await resourceMapping.getFormFields.call(context);
 	const lines = result.fields.find(({ id }) => id === 'Lines');
 	assert.equal(lines.type, undefined);
-	assert.equal(lines.displayName, 'Lines (JSON rows: Item Code, Qty, Unit Price, Owner)');
+	assert.equal(lines.displayName, 'Lines (table)');
 	assert.equal(
 		lines.defaultValue,
 		'[{"Item Code":"","Qty":"","Unit Price":"","Owner":""}]',
 	);
+});
+
+test('the write operations explain table rows, and the edits warn that rows are replaced', () => {
+	const notices = new Inistate().description.properties.filter(
+		({ type, name }) => type === 'notice' && name.endsWith('TableFieldsNotice'),
+	);
+	const byOperation = Object.fromEntries(
+		notices.map((notice) => [notice.displayOptions.show.operation[0], notice.displayName]),
+	);
+
+	assert.deepEqual(Object.keys(byOperation).sort(), ['create', 'performActivity', 'update']);
+	for (const text of Object.values(byOperation)) {
+		assert.match(text, /\[\{"Qty": 1\}, \{"Qty": 2\}\]/);
+	}
+	assert.doesNotMatch(byOperation.create, /replace/);
+	assert.match(byOperation.update, /replace all of the table's rows/);
+	assert.match(byOperation.performActivity, /replace all of the table's rows/);
 });

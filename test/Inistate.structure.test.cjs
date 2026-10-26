@@ -97,15 +97,15 @@ test('advertises exactly the eleven action modules registered by the action node
 	const expectedScopedProperties = {
 		assign: ['documentId', 'username', 'dueDate'],
 		changeState: ['documentId', 'stateName'],
-		create: ['fields'],
+		create: ['createTableFieldsNotice', 'fields'],
 		delete: ['deleteWarning', 'documentId'],
 		duplicate: ['documentId'],
 		get: ['entryIdentifierType', 'entryId'],
 		getAll: ['listing', 'returnAll', 'limit', 'options'],
 		getForm: ['formActivity', 'entryIdentifierType', 'formEntryId'],
 		getHistory: ['entryIdentifierType', 'entryId', 'returnAll', 'limit'],
-		performActivity: ['documentId', 'activityId', 'fields'],
-		update: ['documentId', 'fields'],
+		performActivity: ['documentId', 'activityId', 'performActivityTableFieldsNotice', 'fields'],
+		update: ['documentId', 'updateTableFieldsNotice', 'fields'],
 	};
 	for (const [operation, expectedNames] of Object.entries(expectedScopedProperties)) {
 		const visibleNames = new Inistate().description.properties
