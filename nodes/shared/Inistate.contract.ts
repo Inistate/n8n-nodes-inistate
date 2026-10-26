@@ -365,9 +365,9 @@ export function mapFormFields(
 			// would refuse rows typed in as JSON text. normalizeTableValues parses them instead.
 			const columns = getTableColumns(element).filter((column) => !column.readOnly);
 			if (columns.length > 0) {
-				// The pre-filled row already names every column, so the label stays short enough
-				// for n8n not to cut it off.
-				field.displayName = `${field.displayName} (table)`;
+				field.displayName = `${field.displayName} (JSON rows: ${columns
+					.map((column) => column.label)
+					.join(', ')})`;
 				field.defaultValue = JSON.stringify([
 					Object.fromEntries(columns.map((column) => [column.label, ''])),
 				]);
@@ -622,11 +622,6 @@ function parseTableRows(label: string, value: unknown): unknown[] | undefined {
 			return undefined;
 		}
 		rows = parseJson(text);
-		if (rows === undefined) {
-			throw new Error(
-				`"${label}" is not valid JSON. Check the quotes, commas, and brackets, for example [{"Qty": 1}, {"Qty": 2}]`,
-			);
-		}
 	}
 
 	if (isRecord(rows)) {

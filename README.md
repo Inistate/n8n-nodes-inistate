@@ -201,8 +201,8 @@ duplicate names from selecting the wrong entry.
 
 ### Table fields (line items)
 
-A table field, such as an invoice's **Lines**, appears as one field labelled `(table)`, for example
-`Lines (table)`, pre-filled with an empty row that names its columns. Give it an array of rows, one object
+A table field, such as an invoice's **Lines**, appears as one field whose label lists its columns,
+for example `Lines (JSON rows: Item Code, Qty, Unit Price)`. Give it an array of rows, one object
 per row, either as an expression or as JSON text:
 
 ```js
@@ -221,16 +221,6 @@ per row, either as an expression or as JSON text:
 - A column the form doesn't have stops the item with an error naming it.
 - Create drops a row's `id`, which would name another entry's row; Update and Perform Activity keep
   it, so an edited row stays the same row.
-- **Update and Perform Activity replace the whole table.** The rows you send become the table's only
-  rows; any row you leave out is deleted. To add a row, read the entry with **Get**, then send its
-  existing rows (with their `id`) followed by the new one:
-
-  ```json
-  [
-    { "id": "2b8b12e4-7f29-4b97-8e8e-ee5bc91dbfa7", "Channel": "Indeed", "URL": "www.indeed.com" },
-    { "Channel": "LinkedIn", "URL": "www.linkedin.com" }
-  ]
-  ```
 - When the rows come from several input items (one item per line), combine them first with n8n's
   **Aggregate** node and map the aggregated list into the table field.
 

@@ -5,7 +5,7 @@ import {
 	getCurrentEntryFields,
 	resolveMappedFieldValues,
 } from '../../../shared/GenericFunctions';
-import { documentIdProperty, fieldsProperty, tableFieldsNoticeProperty } from './properties';
+import { documentIdProperty, fieldsProperty } from './properties';
 import type { EntryActionDefinition } from './types';
 
 export const updateEntryAction: EntryActionDefinition = {
@@ -16,7 +16,7 @@ export const updateEntryAction: EntryActionDefinition = {
 		action: 'Update an entry',
 		description: 'Update an entry using its module edit form',
 	},
-	properties: [documentIdProperty('update'), tableFieldsNoticeProperty('update'), fieldsProperty('update')],
+	properties: [documentIdProperty('update'), fieldsProperty('update')],
 	async prepareInput({ itemIndex, moduleId, workspaceId }) {
 		const documentId = String(this.getNodeParameter('documentId', itemIndex));
 		const fields = this.getNodeParameter('fields', itemIndex) as ResourceMapperValue;
