@@ -335,9 +335,10 @@ export function mapFormFields(
 	for (const element of extractFormElements(response)) {
 		const idValue = firstPrimitive(element, ['fieldName', 'name']);
 		const displayNameValue = firstPrimitive(element, ['displayName', 'fieldName', 'name']);
-		const mappedType = mapFieldType(element.type);
+		const isTable = isTableFieldType(element.type);
+		const mappedType = isTable ? undefined : mapFieldType(element.type);
 
-		if (idValue === undefined || displayNameValue === undefined || !mappedType) {
+		if (idValue === undefined || displayNameValue === undefined || (!mappedType && !isTable)) {
 			continue;
 		}
 
@@ -356,8 +357,22 @@ export function mapFormFields(
 			required: element.required === true,
 			display: !readOnly,
 			readOnly,
-			type: mappedType,
+			...(mappedType ? { type: mappedType } : {}),
 		};
+
+		if (isTable) {
+			// Left untyped (see isTableMapperField): n8n validates a typed field strictly, which
+			// would refuse rows typed in as JSON text. normalizeTableValues parses them instead.
+			const columns = getTableColumns(element).filter((column) => !column.readOnly);
+			if (columns.length > 0) {
+				field.displayName = `${field.displayName} (JSON rows: ${columns
+					.map((column) => column.label)
+					.join(', ')})`;
+				field.defaultValue = JSON.stringify([
+					Object.fromEntries(columns.map((column) => [column.label, ''])),
+				]);
+			}
+		}
 
 		if (mappedType === 'options') {
 			const numericType = typeof element.type === 'number' ? element.type : Number(element.type);
@@ -476,6 +491,253 @@ export function toFieldSearchItems(response: unknown, filter = ''): INodeListSea
 		['displayName', 'fieldName'],
 		filter,
 	);
+}
+
+export interface TableColumn {
+	/** The key a row sends for this column: its field name on an API-key form, its display name on an OAuth form. */
+	key: string;
+	label: string;
+	/** Every name a supplied row may use for this column, lower-cased. */
+	names: string[];
+	type: unknown;
+	readOnly: boolean;
+	/** True when the row carries field names, so a Module or User cell is sent as `<col>`, `<col>Id`. */
+	usesFieldNames: boolean;
+}
+
+/** Table (14) and List (15) hold rows; the OAuth form names them "Table" and "List". */
+export function isTableFieldType(type: unknown): boolean {
+	if (typeof type === 'string' && Number.isNaN(Number(type))) {
+		return ['table', 'list'].includes(type.toLocaleLowerCase());
+	}
+
+	const numericType = typeof type === 'number' ? type : Number(type);
+	return numericType === 14 || numericType === 15;
+}
+
+/** mapFormFields leaves only table fields untyped; every other mapped field has a type. */
+export function isTableMapperField(field: ResourceMapperField): boolean {
+	return field.type === undefined;
+}
+
+/**
+ * The columns of a table form element. An API-key form lists them as
+ * `{ fieldName, displayName, type }`; the OAuth form as `{ "<display name>": { type } }`.
+ */
+export function getTableColumns(element: UnknownRecord): TableColumn[] {
+	const columns: TableColumn[] = [];
+	for (const column of Array.isArray(element.fields) ? element.fields : []) {
+		if (!isRecord(column)) {
+			continue;
+		}
+
+		if (typeof column.fieldName === 'string' && column.fieldName.length > 0) {
+			const label = firstPrimitive(column, ['displayName', 'fieldName']);
+			columns.push({
+				key: column.fieldName,
+				label: String(label),
+				names: [column.fieldName, String(label)].map((name) => name.toLocaleLowerCase()),
+				type: column.type,
+				readOnly: column.readOnly === true,
+				usesFieldNames: true,
+			});
+			continue;
+		}
+
+		const entries = Object.entries(column);
+		if (entries.length !== 1 || !isRecord(entries[0][1])) {
+			continue;
+		}
+
+		const [name, definition] = entries[0] as [string, UnknownRecord];
+		columns.push({
+			key: name,
+			label: name,
+			names: [name.toLocaleLowerCase()],
+			type: definition.type,
+			readOnly: definition.readOnly === true,
+			usesFieldNames: false,
+		});
+	}
+
+	return columns;
+}
+
+/**
+ * Turns the rows a workflow maps into a table field into the rows the activity route takes.
+ * Rows may arrive as an array, a JSON string, or one row object, and may name a column by its
+ * field name or display name in any case. Read envelopes (`{ value }`, `{ id, value }`) are
+ * unwrapped, so rows from Get can be written back. Empty cells and empty rows are dropped, and
+ * a table left with no rows is omitted, unless the workflow sent an explicit empty array.
+ * A row's `id` is kept only when `keepRowIds` is set: on create it would name another entry's row.
+ */
+export function normalizeTableValues(
+	values: IDataObject,
+	form: unknown,
+	options: { keepRowIds: boolean },
+): IDataObject {
+	const normalized: IDataObject = { ...values };
+	for (const element of extractFormElements(form)) {
+		if (!isTableFieldType(element.type)) {
+			continue;
+		}
+
+		const key = firstPrimitive(element, ['fieldName', 'name']);
+		if (key === undefined || !Object.prototype.hasOwnProperty.call(normalized, String(key))) {
+			continue;
+		}
+
+		const tableKey = String(key);
+		const label = String(firstPrimitive(element, ['displayName', 'fieldName', 'name']) ?? key);
+		const rows = parseTableRows(label, normalized[tableKey]);
+		if (rows === undefined) {
+			delete normalized[tableKey];
+			continue;
+		}
+
+		const columns = getTableColumns(element);
+		const mappedRows = rows
+			.map((row, index) => normalizeTableRow(label, index, row, columns, options.keepRowIds))
+			.filter((row) => Object.keys(row).some((cell) => cell !== 'id'));
+		if (mappedRows.length === 0 && rows.length > 0) {
+			delete normalized[tableKey];
+			continue;
+		}
+
+		normalized[tableKey] = mappedRows;
+	}
+
+	return normalized;
+}
+
+function parseTableRows(label: string, value: unknown): unknown[] | undefined {
+	let rows = value;
+	if (rows === undefined || rows === null) {
+		return undefined;
+	}
+
+	if (typeof rows === 'string') {
+		const text = rows.trim();
+		if (!text) {
+			return undefined;
+		}
+		rows = parseJson(text);
+	}
+
+	if (isRecord(rows)) {
+		return [rows];
+	}
+	if (!Array.isArray(rows)) {
+		throw new Error(`"${label}" must be a JSON array of rows, for example [{"Qty": 1}]`);
+	}
+
+	return rows;
+}
+
+/** Text that is not JSON comes back undefined, which no JSON text parses to. */
+function parseJson(text: string): unknown {
+	try {
+		return JSON.parse(text) as unknown;
+	} catch {
+		return undefined;
+	}
+}
+
+function normalizeTableRow(
+	label: string,
+	index: number,
+	row: unknown,
+	columns: TableColumn[],
+	keepRowIds: boolean,
+): IDataObject {
+	if (!isRecord(row)) {
+		throw new Error(`Row ${index + 1} of "${label}" must be an object of column values`);
+	}
+
+	const normalized: IDataObject = {};
+	for (const [name, cell] of Object.entries(row)) {
+		if (name === 'id') {
+			if (keepRowIds && (typeof cell === 'string' || typeof cell === 'number')) {
+				normalized.id = cell;
+			}
+			continue;
+		}
+
+		if (columns.length === 0) {
+			const value = unwrapCell(cell);
+			if (!isEmptyCell(value)) {
+				normalized[name] = value as IDataObject[string];
+			}
+			continue;
+		}
+
+		const column = columns.find((candidate) =>
+			candidate.names.includes(name.toLocaleLowerCase()),
+		);
+		if (!column) {
+			throw new Error(
+				`"${label}" has no column "${name}". Its columns are: ${columns
+					.map((candidate) => candidate.label)
+					.join(', ')}`,
+			);
+		}
+
+		if (isRecord(cell) && (cell.id !== undefined || cell.Id !== undefined)) {
+			const reference = normalizeReferenceRecord({
+				...cell,
+				name: cell.name ?? cell.value ?? cell.Text,
+			});
+			if (reference && column.usesFieldNames) {
+				normalized[column.key] = reference.name;
+				normalized[`${column.key}Id`] = reference.id;
+				if (reference.username !== undefined) {
+					normalized[`${column.key}Username`] = reference.username;
+				}
+				continue;
+			}
+			if (reference) {
+				normalized[column.key] = {
+					value: reference.name,
+					id: reference.id,
+					...(reference.username !== undefined ? { username: reference.username } : {}),
+				};
+				continue;
+			}
+		}
+
+		const value = coerceCell(unwrapCell(cell), column.type);
+		if (!isEmptyCell(value)) {
+			normalized[column.key] = value as IDataObject[string];
+		}
+	}
+
+	return normalized;
+}
+
+function unwrapCell(cell: unknown): unknown {
+	return isRecord(cell) && Object.keys(cell).length === 1 && 'value' in cell ? cell.value : cell;
+}
+
+function isEmptyCell(value: unknown): boolean {
+	return value === undefined || value === null || (typeof value === 'string' && !value.trim());
+}
+
+function coerceCell(value: unknown, type: unknown): unknown {
+	if (typeof value !== 'string' || !value.trim()) {
+		return value;
+	}
+
+	const mappedType = mapFieldType(type);
+	if (mappedType === 'number') {
+		const number = Number(value.trim());
+		return Number.isFinite(number) ? number : value;
+	}
+	if (mappedType === 'boolean') {
+		const text = value.trim().toLocaleLowerCase();
+		return text === 'true' ? true : text === 'false' ? false : value;
+	}
+
+	return value;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {

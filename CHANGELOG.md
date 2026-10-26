@@ -6,6 +6,11 @@ All notable changes are recorded here. This project follows Semantic Versioning.
 
 ### Added
 
+- Table fields (line items) on Create, Update, and Perform Activity, with API-key and OAuth
+  credentials. A table appears as one field of JSON rows whose label lists its columns; rows are
+  matched to columns by display name or field name, read envelopes are unwrapped, numbers and
+  yes/no values are typed, empty cells and rows are dropped, and an unknown column stops the item.
+  Before this, API-key forms dropped table fields and OAuth forms offered them as plain text.
 - Read operations on the Inistate action node, backed by the Inistate MCP API surface:
   - **Get** (`POST /api/mcp/entry`) returns one entry with its field values, current state, and
     `availableActivities` (`standard`, `custom`, and `stateFlow.currentState`/`transitions`).
